@@ -37,6 +37,8 @@ from app.tools import fix_site_tool  # noqa: F401 - registers fix_site
 from app.tools import monitor_tool  # noqa: F401 - registers monitor_brand
 from app.tools import propose_fix  # noqa: F401 - registers propose_fix
 from app.tools import video_tool  # noqa: F401 - registers start_video_session
+from app.tools import web_search_tool  # noqa: F401 - registers web_search
+from app.tools import github_tool  # noqa: F401 - registers fix_github
 from app.tools.registry import registry
 
 settings = get_settings()
@@ -156,6 +158,7 @@ class ChatRequest(BaseModel):
     message: str
     participant: str = "web-user"
     history: list[dict[str, str]] = []
+    brand_slug: str = ""  # the selected project; makes the agent project-aware
 
 
 class MonitorConfigBody(BaseModel):
@@ -164,6 +167,10 @@ class MonitorConfigBody(BaseModel):
     interval_minutes: int = 30
     threshold: float = 0.7
     enabled: bool = True
+    project_type: str = "physical"
+    repo_url: str = ""
+    discord_channel: str = ""
+    name: str = ""
 
 
 class TwilioCallBody(BaseModel):
@@ -177,6 +184,46 @@ except OSError:
     SYSTEM_PROMPT = "You are TwoCustomer, an always-on AI analyst for a consumer brand."
 
 
+async def _project(brand_slug: str) -> dict[str, Any]:
+    """Load the selected project's config so the agent is project-aware."""
+    # NB: keys here are spread into registry.dispatch(**ctx), so avoid names that
+    # collide with its params ("name", "args").
+    base = {"brand_slug": brand_slug, "project_type": "physical",
+            "repo_url": "", "discord_channel": "", "project_name": brand_slug}
+    if not brand_slug:
+        return base
+    try:
+        from app.monitor.config import get_config
+
+        cfg = await get_config(brand_slug)
+        if cfg:
+            base.update({"project_type": cfg.project_type, "repo_url": cfg.repo_url,
+                         "discord_channel": cfg.discord_channel,
+                         "project_name": cfg.name or brand_slug})
+    except Exception:  # noqa: BLE001
+        pass
+    return base
+
+
+def _system_for(proj: dict[str, Any]) -> str:
+    """Base prompt + a per-project preamble so the agent prioritizes correctly."""
+    if not proj.get("brand_slug"):
+        return SYSTEM_PROMPT
+    if proj["project_type"] == "software":
+        focus = (f"This is a SOFTWARE project. Connected repo: "
+                 f"{proj['repo_url'] or '(none)'}. Prefer web_search to research and "
+                 f"fix_github to diagnose + patch the repo (open a PR). You can also "
+                 f"monitor, draft copy, and interview users.")
+    else:
+        focus = ("This is a PHYSICAL consumer-product project. Prefer monitor_brand, "
+                 "create_campaign, web_search, edit_product_image, and customer "
+                 "interviews. Use fix_github only if the user connects a repo.")
+    pre = (f"\n\n--- CURRENT PROJECT ---\nName: {proj['project_name']} (slug: {proj['brand_slug']}). "
+           f"{focus}\nWhen a tool needs a brand, use this project's slug "
+           f"'{proj['brand_slug']}' unless the user names another.")
+    return SYSTEM_PROMPT + pre
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest) -> EventSourceResponse:
     """Stream the agent's reply as SSE events: token / tool_start / tool_end / done."""
@@ -186,6 +233,8 @@ async def chat(req: ChatRequest) -> EventSourceResponse:
         for h in req.history
     ]
     messages.append({"role": "user", "content": req.message})
+    proj = await _project(req.brand_slug)
+    system = _system_for(proj)
 
     async def event_gen():
         from app.state.limits import allow
@@ -211,8 +260,9 @@ async def chat(req: ChatRequest) -> EventSourceResponse:
             try:
                 with obs.Timer() as t:
                     res = await run_agent(
-                        llm=llm, registry=registry, system=SYSTEM_PROMPT,
-                        messages=messages, context={"participant": req.participant},
+                        llm=llm, registry=registry, system=system,
+                        messages=messages,
+                        context={"participant": req.participant, **proj},
                         on_event=on_event,
                     )
                 obs.trace_agent_run(

@@ -18,6 +18,11 @@ class MonitorConfig(BaseModel):
     interval_minutes: int = Field(default=30, ge=1, le=1440)
     threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     enabled: bool = True
+    # Project metadata so the agent is project-aware.
+    project_type: str = "physical"  # "software" | "physical"
+    repo_url: str = ""
+    discord_channel: str = ""
+    name: str = ""
 
 
 def _key(slug: str) -> str:

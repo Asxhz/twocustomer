@@ -22,14 +22,12 @@ def test_unified_diff():
     assert "-b" in d and "+c" in d and "x.txt" in d
 
 
-def test_collect_source_skips_deps(tmp_path):
-    (tmp_path / "index.html").write_text("<h1>hi</h1>")
-    (tmp_path / "node_modules").mkdir()
-    (tmp_path / "node_modules" / "dep.js").write_text("x")
-    (tmp_path / "data.bin").write_bytes(b"\x00\x01")
-    files = github.collect_source(tmp_path)
-    assert "index.html" in files
-    assert not any("node_modules" in k for k in files)
+def test_skip_path():
+    assert not github._skip_path("index.html")
+    assert not github._skip_path("src/app.tsx")
+    assert github._skip_path("node_modules/dep/x.js")
+    assert github._skip_path("data.bin")
+    assert github._skip_path(".env")
 
 
 def test_github_endpoint_bad_url():

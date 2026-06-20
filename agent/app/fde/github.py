@@ -12,13 +12,9 @@ extensions, never pushes to the default branch (PR only), temp sandbox cleaned u
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import re
-import shutil
-import tempfile
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -33,54 +29,62 @@ _MAX_BYTES = 400_000  # total source sent to the model
 _API = "https://api.github.com"
 
 
+def _gh_headers() -> dict[str, str]:
+    h = {"Accept": "application/vnd.github+json", "User-Agent": "twocustomer-fde"}
+    tok = get_settings().github_token
+    if tok:
+        h["Authorization"] = f"Bearer {tok}"
+    return h
+
+
 def parse_repo(url: str) -> tuple[str, str] | None:
     """Return (owner, repo) for a public github.com URL, else None."""
     m = _GH_RE.match((url or "").strip())
     return (m.group(1), m.group(2)) if m else None
 
 
-async def clone(owner: str, repo: str) -> Path:
-    """Shallow-clone a public repo into a temp dir. Raises on failure/timeout."""
-    tmp = Path(tempfile.mkdtemp(prefix="twocustomer-gh-"))
-    dst = tmp / repo
-    proc = await asyncio.create_subprocess_exec(
-        "git", "clone", "--depth", "1", "--single-branch",
-        f"https://github.com/{owner}/{repo}.git", str(dst),
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-    )
-    try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout=90)
-    except asyncio.TimeoutError:
-        proc.kill()
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise RuntimeError("clone timed out")
-    if proc.returncode != 0:
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise RuntimeError(f"clone failed: {out.decode()[:200]}")
-    return dst
+def _skip_path(path: str) -> bool:
+    parts = path.split("/")
+    if any(p in {"node_modules", ".git", ".next", "dist", "build", "vendor"} for p in parts):
+        return True
+    name = parts[-1]
+    suffix = "." + name.rsplit(".", 1)[1] if "." in name else ""
+    return suffix not in ALLOWED_EXT or name in BLOCKED
 
 
-def collect_source(root: Path) -> dict[str, str]:
-    """Read allow-listed text files (skipping deps), capped by count + bytes."""
+async def read_repo(owner: str, repo: str) -> dict[str, str]:
+    """Read allow-listed source files via the GitHub API (no git binary needed,
+    so it runs on serverless). Capped by file count + total bytes."""
     out: dict[str, str] = {}
-    total = 0
-    for p in sorted(root.rglob("*")):
-        if len(out) >= _MAX_FILES or total >= _MAX_BYTES:
-            break
-        if not p.is_file() or p.suffix not in ALLOWED_EXT or p.name in BLOCKED:
-            continue
-        rel = p.relative_to(root)
-        if any(part in {"node_modules", ".git", ".next", "dist", "build"}
-               for part in rel.parts):
-            continue
-        try:
-            text = p.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        if len(text) > 40_000:  # skip huge files
-            continue
-        out[str(rel)] = text
-        total += len(text)
+    async with httpx.AsyncClient(timeout=30, headers=_gh_headers()) as c:
+        meta = await c.get(f"{_API}/repos/{owner}/{repo}")
+        if meta.status_code != 200:
+            raise RuntimeError(f"repo not found ({meta.status_code})")
+        branch = meta.json().get("default_branch", "main")
+        tree = await c.get(f"{_API}/repos/{owner}/{repo}/git/trees/{branch}",
+                           params={"recursive": "1"})
+        if tree.status_code != 200:
+            raise RuntimeError("could not read repo tree")
+        blobs = [n for n in tree.json().get("tree", [])
+                 if n.get("type") == "blob" and not _skip_path(n["path"])
+                 and n.get("size", 0) <= 40_000]
+        blobs.sort(key=lambda n: n["path"])
+        total = 0
+        for n in blobs:
+            if len(out) >= _MAX_FILES or total >= _MAX_BYTES:
+                break
+            blob = await c.get(f"{_API}/repos/{owner}/{repo}/git/blobs/{n['sha']}")
+            if blob.status_code != 200:
+                continue
+            data = blob.json()
+            if data.get("encoding") != "base64":
+                continue
+            try:
+                text = base64.b64decode(data["content"]).decode("utf-8")
+            except (UnicodeDecodeError, ValueError):
+                continue
+            out[n["path"]] = text
+            total += len(text)
     return out
 
 
@@ -159,10 +163,8 @@ async def fix_github(repo_url: str, symptom: str, *, context: str = "",
     if not parsed:
         return {"error": "Not a valid public github.com repo URL."}
     owner, repo = parsed
-    sandbox = None
     try:
-        sandbox = await clone(owner, repo)
-        files = collect_source(sandbox)
+        files = await read_repo(owner, repo)
         if not files:
             return {"error": "No readable source files found in the repo."}
         fix = await diagnose(files, symptom, context)
@@ -180,6 +182,3 @@ async def fix_github(repo_url: str, symptom: str, *, context: str = "",
         }
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
-    finally:
-        if sandbox is not None:
-            shutil.rmtree(sandbox.parent, ignore_errors=True)
