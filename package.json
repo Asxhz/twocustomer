@@ -1,0 +1,13 @@
+{
+  "name": "twocustomer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The AI forward-deployed agent team for consumer brands.",
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "seed": "python scripts/seed.py",
+    "test": "./scripts/test.sh",
+    "check-env": "python scripts/check_env.py"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

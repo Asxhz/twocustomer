@@ -1,0 +1,31 @@
+{
+  "display_information": {
+    "name": "TwoCustomer",
+    "description": "Your brand's 24/7 AI analyst — alerts, insights, and actions in Slack.",
+    "background_color": "#0b0b0b"
+  },
+  "features": {
+    "bot_user": { "display_name": "TwoCustomer", "always_online": true },
+    "slash_commands": [
+      {
+        "command": "/twocustomer",
+        "url": "https://YOUR_AGENT_HOST/slack/command",
+        "description": "Ask TwoCustomer to monitor, build a campaign, or surface insights",
+        "usage_hint": "monitor Aurora Drinks"
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": ["app_mentions:read", "chat:write", "commands", "channels:history"]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://YOUR_AGENT_HOST/slack/events",
+      "bot_events": ["app_mention", "message.channels"]
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false
+  }
+}

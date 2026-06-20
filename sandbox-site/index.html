@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lumen Flutes</title>
+    <style>
+      body { background:#0b0b0b; color:#fff; font-family:Georgia,serif; display:grid; place-items:center; height:100vh; margin:0; }
+      h1 { font-size:3rem; }
+    </style>
+  </head>
+  <body>
+    <h1 id="hero">…</h1>
+    <script src="./site.js"></script>
+    <script>
+      // mirrors site.js render() in the browser
+      document.getElementById("hero").textContent =
+        (typeof render === "function")
+          ? render("hi my name is lumen flutes").split(" ").slice(0, 4).join(" ")
+          : "hi my name is";
+    </script>
+  </body>
+</html>
