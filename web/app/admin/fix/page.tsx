@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Nav from "@/components/Nav";
 import { Badge, Button, Card, Field, inputCls, Spinner } from "@/components/ui";
 
@@ -19,6 +19,14 @@ export default function FixPanel() {
   // GitHub mode
   const [repoUrl, setRepoUrl] = useState("");
   const [ghSymptom, setGhSymptom] = useState("");
+
+  // Prefill the repo connected during onboarding.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("tc_repo");
+      if (saved) setRepoUrl(saved);
+    } catch {}
+  }, []);
   const [ghCtx, setGhCtx] = useState("");
   const [gh, setGh] = useState<GithubResult | null>(null);
   const [ghBusy, setGhBusy] = useState(false);

@@ -1,4 +1,5 @@
 import Nav from "@/components/Nav";
+import AutoRefresh from "@/components/AutoRefresh";
 import { listMentions } from "@/lib/convexHttp";
 
 export const dynamic = "force-dynamic";
@@ -13,19 +14,22 @@ export default async function Monitor() {
           <div>
             <h1 className="text-2xl font-semibold">Live monitor</h1>
             <p className="text-sm text-white/50">
-              Browserbase agents watching X · Reddit · LinkedIn · web.
+              Agents watching news · Reddit · web — scored for risk + opportunity.
             </p>
           </div>
-          <span
-            className={
-              "rounded-full px-2 py-0.5 text-xs " +
-              (live
-                ? "bg-emerald-500/15 text-emerald-300"
-                : "bg-white/10 text-white/50")
-            }
-          >
-            {live ? "● live (Convex)" : "○ demo data"}
-          </span>
+          <div className="flex items-center gap-3">
+            <AutoRefresh seconds={12} />
+            <span
+              className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (live
+                  ? "bg-emerald-500/15 text-emerald-300"
+                  : "bg-white/10 text-white/50")
+              }
+            >
+              {live ? "● live (Convex)" : "○ demo data"}
+            </span>
+          </div>
         </header>
         <ul className="flex flex-col gap-3">
           {rows.map((m, i) => (

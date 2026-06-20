@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 
-const STEPS = ["Brand", "Web terms", "Social handles", "Connect Discord"] as const;
+const STEPS = ["Brand", "Web terms", "Social handles", "Connect Discord", "GitHub repo"] as const;
 
 // Discord bot-invite (real OAuth2) — needs a public client id to be live.
 const DISCORD_CLIENT_ID = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "";
@@ -17,6 +17,7 @@ export default function Onboarding() {
   const [brand, setBrand] = useState("");
   const [terms, setTerms] = useState("");
   const [handles, setHandles] = useState("");
+  const [repo, setRepo] = useState("");
   const [armed, setArmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -40,6 +41,10 @@ export default function Onboarding() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Failed to arm monitors");
       setSlug(data.slug || "");
+      // Remember the repo so the Fix page prefills it (connects onboarding → FDE).
+      if (repo.trim()) {
+        try { window.localStorage.setItem("tc_repo", repo.trim()); } catch {}
+      }
       setArmed(true);
     } catch (e) {
       setErr((e as Error).message);
@@ -61,12 +66,12 @@ export default function Onboarding() {
           </p>
           {slug && (
             <p className="mt-1 text-xs text-white/30">
-              monitor slug: <span className="font-mono text-emerald-400/70">{slug}</span>
+              monitor slug: <span className="font-mono text-accent-soft/70">{slug}</span>
             </p>
           )}
           <Link
             href="/admin"
-            className="mt-6 inline-block rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-black"
+            className="mt-6 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:brightness-110"
           >
             Go to dashboard
           </Link>
@@ -85,7 +90,7 @@ export default function Onboarding() {
               key={s}
               className={
                 "h-1 flex-1 rounded-full " +
-                (i <= step ? "bg-emerald-400" : "bg-white/10")
+                (i <= step ? "bg-accent" : "bg-white/10")
               }
             />
           ))}
@@ -102,7 +107,7 @@ export default function Onboarding() {
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="Brand name (e.g. Aurora Drinks)"
-              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-emerald-400/50"
+              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-accent-soft/60"
             />
           )}
           {step === 1 && (
@@ -111,7 +116,7 @@ export default function Onboarding() {
               value={terms}
               onChange={(e) => setTerms(e.target.value)}
               placeholder="Search terms, comma-separated"
-              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-emerald-400/50"
+              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-accent-soft/60"
             />
           )}
           {step === 2 && (
@@ -120,7 +125,16 @@ export default function Onboarding() {
               value={handles}
               onChange={(e) => setHandles(e.target.value)}
               placeholder="@x, r/subreddit, linkedin/company"
-              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-emerald-400/50"
+              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-accent-soft/60"
+            />
+          )}
+          {step === 4 && (
+            <input
+              autoFocus
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              placeholder="https://github.com/owner/repo (the agent fixes this)"
+              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-accent-soft/60"
             />
           )}
           {step === 3 && (
@@ -129,7 +143,7 @@ export default function Onboarding() {
                 href={DISCORD_INVITE}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-lg border border-white/15 px-3 py-2 text-center text-sm hover:border-emerald-400/50"
+                className="rounded-lg border border-white/15 px-3 py-2 text-center text-sm hover:border-accent-soft/50"
               >
                 Add TwoCustomer to Discord (OAuth) →
               </a>
@@ -157,7 +171,7 @@ export default function Onboarding() {
           <button
             onClick={next}
             disabled={saving || (last && !brand.trim())}
-            className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-medium text-black disabled:opacity-40"
+            className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
           >
             {saving ? "Arming…" : last ? "Arm monitors" : "Next"}
           </button>

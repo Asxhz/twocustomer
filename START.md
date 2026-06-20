@@ -25,23 +25,35 @@ Login is email-only (cookie) — no key, just enter an email.
 
 ## 2. Run
 
+**Local dev** (everything on localhost):
 ```bash
-./scripts/dev.sh        # boots all 3, Ctrl-C stops all
+./scripts/dev.sh        # convex + agent + web, Ctrl-C stops all
 ```
+
+**Live demo** (deployed web → your local agent via a public tunnel):
+```bash
+./scripts/demo_up.sh    # agent + Cloudflare tunnel + rewires the deployed site
+```
+Keep that terminal open. It prints the live web URL. The deployed serverless
+agent can't run long chats / FDE clones, so the demo runs the real agent locally
+and tunnels to it.
 
 ## 3. Open
 
-- Web: http://localhost:3000
-- Dashboard (live mentions): http://localhost:3000/monitor
-- Onboarding: http://localhost:3000/admin/onboarding
+- Live web: https://twocustomer-ashs-projects-548e0de1.vercel.app
+- Local web: http://localhost:3000
+- Status board (all integrations): `/status`
 - Agent health: http://localhost:8000/health
 
-## Demo path (90 sec)
+## Demo path (2 min)
 
-1. `/admin/onboarding` → type brand → **Arm monitors** (persists, real).
-2. `/monitor` → live news mentions, risk-scored.
-3. `/admin/fix` → fix a broken site: `hi hi my my` → `hi my name is` (real Claude patch + validate).
-4. `/admin` chat → ask "latest risk signal?" → agent runs tools, answers.
+1. **Sign in** (any email) → dashboard.
+2. **Onboarding** → brand + terms + **GitHub repo** → Arm. (repo prefills the Fix page.)
+3. **/monitor** → live news + Reddit mentions, risk-scored, auto-refreshing.
+4. **/admin chat** → "build a campaign for <brand>" → watch tools run live → campaign.
+5. **/admin/fix → GitHub repo** → paste a repo → clone → diagnose → **PR / diff**.
+6. **/admin/studio** → prompt → real Gemini image.
+7. **/status** → every integration green.
 
 ## Test
 
