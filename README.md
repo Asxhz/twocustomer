@@ -24,7 +24,7 @@ Two customers, one product: the **brand (admin)** and the **brand's customers (u
 | Memory / cache | Upstash Redis |
 | Realtime state | Convex |
 | Web | Next.js 16 (App Router, React 19, Tailwind 4) on Vercel |
-| Auth | Clerk (optional — open without keys) |
+| Auth | Lightweight email sign-in (cookie-based, no external provider) |
 | Channels | Web · Discord · Voice · SMS · Video |
 
 ## Layout

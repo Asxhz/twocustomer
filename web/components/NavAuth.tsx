@@ -1,22 +1,29 @@
-import Link from "next/link";
+"use client";
 
-// Renders Clerk's sign-in / user button only when Clerk is configured.
-// Falls back to the open "Customer view" link otherwise.
-const clerkOn = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function NavAuth() {
-  if (!clerkOn) {
-    return (
-      <Link
-        href="/u"
-        className="rounded-md border border-white/15 px-3 py-1 text-xs text-white/70 hover:text-white"
-      >
-        Customer view
-      </Link>
-    );
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setEmail(d.email))
+      .catch(() => setEmail(null))
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setEmail(null);
+    router.push("/");
+    router.refresh();
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { SignedIn, SignedOut, UserButton, SignInButton } = require("@clerk/nextjs");
+
   return (
     <div className="flex items-center gap-3">
       <Link
@@ -25,16 +32,24 @@ export default function NavAuth() {
       >
         Customer view
       </Link>
-      <SignedOut>
-        <SignInButton mode="modal">
-          <button className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-medium text-black hover:bg-emerald-400">
-            Sign in
+      {!loaded ? null : email ? (
+        <>
+          <span className="hidden text-xs text-white/40 sm:inline">{email}</span>
+          <button
+            onClick={signOut}
+            className="rounded-md border border-white/15 px-3 py-1 text-xs text-white/70 hover:text-white"
+          >
+            Sign out
           </button>
-        </SignInButton>
-      </SignedOut>
-      <SignedIn>
-        <UserButton afterSignOutUrl="/" />
-      </SignedIn>
+        </>
+      ) : (
+        <Link
+          href="/sign-in"
+          className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-medium text-black hover:bg-emerald-400"
+        >
+          Sign in
+        </Link>
+      )}
     </div>
   );
 }

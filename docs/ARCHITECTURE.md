@@ -27,7 +27,7 @@
 
 | Path | Role |
 |---|---|
-| `web/` | Next.js 16 (App Router, Tailwind 4) on Vercel. Two-tier surface: brand-admin (`/admin/*`) + customer (`/u/*`), packets, sessions, studio, integrations. Proxies to the agent via token-authenticated SSE. Optional Clerk login. |
+| `web/` | Next.js 16 (App Router, Tailwind 4) on Vercel. Two-tier surface: brand-admin (`/admin/*`) + customer (`/u/*`), packets, sessions, studio, integrations. Proxies to the agent via token-authenticated SSE. Email sign-in gates the brand console. |
 | `agent/` | FastAPI control plane. Claude tool loop (`claude-sonnet-4-6`), the monitor scheduler, the FDE sandbox fix loop, channel routes (Discord, Deepgram voice, Twilio, Daily), Redis memory, Convex client. The web app and uAgent both call it. |
 | `agent/app/monitor/` | Listen loop: scrapers (HN keyless + Google News via Browserbase) → dedup → score → Convex mentions → Claude insight. |
 | `agent/app/fde/` | Fix loop: copy a site into an isolated sandbox, let Claude diagnose + patch, validate, optional Vercel preview. Never touches prod. |

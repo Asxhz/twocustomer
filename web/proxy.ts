@@ -1,26 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Clerk login is optional: it activates only when the publishable key is set,
-// so the app still runs (open) without Clerk configured. When configured, it
-// protects the brand console.
-const clerkOn = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+// Dead-simple demo auth: the brand console (/admin, /sessions) needs a
+// `tc_user` cookie, set by the email-only sign-in. No provider, no password.
+const GATED = [/^\/admin/, /^\/sessions/];
 
-let handler: (req: NextRequest) => Response | Promise<Response>;
-
-if (clerkOn) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { clerkMiddleware, createRouteMatcher } = require("@clerk/nextjs/server");
-  const isProtected = createRouteMatcher(["/admin(.*)", "/sessions(.*)"]);
-  handler = clerkMiddleware(
-    async (auth: { protect: () => Promise<unknown> }, req: NextRequest) => {
-      if (isProtected(req)) await auth.protect();
-    },
-  );
-} else {
-  handler = () => NextResponse.next();
+export default function proxy(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+  if (GATED.some((re) => re.test(path)) && !req.cookies.get("tc_user")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/sign-in";
+    url.searchParams.set("next", path);
+    return NextResponse.redirect(url);
+  }
+  return NextResponse.next();
 }
-
-export default handler;
 
 export const config = {
   matcher: ["/((?!_next|.*\\..*).*)", "/(api|trpc)(.*)"],

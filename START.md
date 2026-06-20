@@ -20,7 +20,8 @@ Empty keys = that feature politely turns off. Nothing crashes.
 | `GEMINI_API_KEY` | image edit (Studio) |
 | `DAILY_API_KEY` | video call |
 | `TWILIO_*` | SMS / phone interview |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | login wall (else open) |
+
+Login is email-only (cookie) — no key, just enter an email.
 
 ## 2. Run
 
