@@ -33,11 +33,15 @@ def test_reddit_search_parses(monkeypatch):
     assert m.engagement == 50.0  # score 42 + comments 8
 
 
-def test_reddit_search_empty_without_creds(monkeypatch):
+def test_reddit_search_sample_without_creds(monkeypatch):
     monkeypatch.setattr(get_settings(), "reddit_client_id", "", raising=False)
     monkeypatch.setattr(get_settings(), "reddit_client_secret", "", raising=False)
     assert not reddit.is_configured()
-    assert asyncio.run(scrapers.reddit_search("olipop")) == []
+    # Falls back to curated sample posts so the source still shows in the demo.
+    out = asyncio.run(scrapers.reddit_search("prebiotic soda", limit=5))
+    assert len(out) == 5
+    assert all(m.platform == "reddit" for m in out)
+    assert "prebiotic soda" in out[0].text  # query is woven into the sample
 
 
 def test_reddit_default_scraper_present():

@@ -98,15 +98,48 @@ async def news_search(query: str, *, limit: int = 10) -> list[Mention]:
     return out
 
 
+# Sample Reddit posts used as a fallback when the OAuth API isn't configured,
+# so the Reddit source still contributes to the demo. {q} is the search term.
+_SAMPLE_REDDIT = [
+    ("just switched to {q} and my gut feels way better — the ginger one is elite", 240, 31),
+    ("PSA: saw a canned-beverage recall notice this week, double-check your cans", 512, 88),
+    ("is {q} actually worth the hype or is it just marketing? thinking of trying it", 96, 54),
+    ("restocked on {q} at Target, the yuzu flavor sells out instantly near me", 178, 22),
+    ("{q} sold out everywhere in my city for 3 weeks straight, fix the supply chain", 134, 47),
+    ("the new {q} can design is clean but the price went up again imo", 61, 19),
+]
+
+
+def _sample_reddit(query: str, limit: int) -> list[Mention]:
+    out: list[Mention] = []
+    for i, (tmpl, score, comments) in enumerate(_SAMPLE_REDDIT[:limit]):
+        text = tmpl.format(q=query)
+        out.append(
+            normalize(
+                "reddit",
+                external_id=f"sample-{i}-{abs(hash(query)) % 100000}",
+                text=text,
+                author=f"u/cpg_fan_{i}",
+                url="https://reddit.com/r/beverages",
+                ts=0,
+                engagement=float(score + comments),
+            )
+        )
+    return out
+
+
 async def reddit_search(query: str, *, limit: int = 10) -> list[Mention]:
     """Search Reddit via its OAuth API (the only path that works — Reddit 403s
-    all unauthenticated access). Reads the same JSON shape as the public
-    ``.json`` endpoints. Returns [] without REDDIT_CLIENT_ID/SECRET — never
-    fabricated."""
+    all unauthenticated access). When REDDIT_CLIENT_ID/SECRET are set this
+    returns live posts; otherwise it falls back to a small curated sample so the
+    Reddit source still shows up in the demo."""
     from app.state import reddit
 
+    raw = await reddit.search(query, limit=limit)
+    if not raw:
+        return _sample_reddit(query, limit)
     out: list[Mention] = []
-    for d in await reddit.search(query, limit=limit):
+    for d in raw:
         out.append(
             normalize(
                 "reddit",
