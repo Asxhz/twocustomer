@@ -19,7 +19,8 @@ from app.state.convex_client import get_convex  # noqa: E402
 DEMO_BRAND = {
     "name": "Aurora Drinks",
     "slug": "aurora-drinks",
-    "terms": ["Aurora Drinks", "@auroradrinks", "aurora sparkling"],
+    "terms": ["energy drink recall", "sparkling water brand", "prebiotic soda",
+              "beverage launch", "canned beverage"],
     "handles": {"x": "auroradrinks", "reddit": "auroradrinks"},
 }
 
@@ -49,8 +50,9 @@ async def main() -> int:
     print("brand:", brand_id)
     now = int(time.time() * 1000)
     for m in DEMO_MENTIONS:
-        res = await cx.mutation("mentions:insertMention", brandId=brand_id,
-                                ts=now, **m)
+        # insertMention resolves the brand by slug, not _id.
+        res = await cx.mutation("mentions:insertMention",
+                                brandId=DEMO_BRAND["slug"], ts=now, **m)
         print("mention", m["externalId"], "->", res)
     return 0
 
