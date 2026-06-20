@@ -67,6 +67,8 @@ class Settings:
         # Reddit OAuth (script app: reddit.com/prefs/apps) for .json monitoring
         self.reddit_client_id = os.environ.get("REDDIT_CLIENT_ID", "")
         self.reddit_client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
+        # GitHub token (repo scope) — lets the FDE open a PR with its fix.
+        self.github_token = os.environ.get("GITHUB_TOKEN", "")
         # wiring
         self.agent_base_url = os.environ.get("AGENT_BASE_URL", "http://localhost:8000")
         self.web_base_url = os.environ.get("WEB_BASE_URL", "http://localhost:3000")

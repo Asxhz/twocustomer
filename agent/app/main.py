@@ -87,8 +87,8 @@ app.add_middleware(
 # Agent-facing endpoints require AGENT_SHARED_TOKEN *when it is configured*.
 # Webhooks (/slack, /twilio, /discord) use their own signature verification and
 # are excluded. /health, /assets, /sentry-debug stay open.
-_PROTECTED = ("/chat", "/interview", "/session/video", "/fde/fix", "/edit/image",
-              "/monitor/config")
+_PROTECTED = ("/chat", "/interview", "/session/video", "/fde/fix", "/fde/github",
+              "/edit/image", "/monitor/config")
 
 
 @app.middleware("http")
@@ -448,6 +448,23 @@ async def fde_fix_ep(req: FixBody) -> dict[str, Any]:
     if not settings.has_anthropic():
         return {"error": "ANTHROPIC_API_KEY not set", "resolved": False}
     return await fix_site(req.symptom)
+
+
+class GithubFixBody(BaseModel):
+    repo_url: str
+    symptom: str
+    context: str = ""
+
+
+@app.post("/fde/github")
+async def fde_github_ep(req: GithubFixBody) -> dict[str, Any]:
+    """Clone a public GitHub repo, diagnose + patch the bug, open a PR / return
+    a diff. Pulls extra context (Discord + web monitoring) when provided."""
+    from app.fde.github import fix_github
+
+    if not settings.has_anthropic():
+        return {"error": "ANTHROPIC_API_KEY not set"}
+    return await fix_github(req.repo_url, req.symptom, context=req.context)
 
 
 # ── Daily video + screen-share session ────────────────────────────────────────
