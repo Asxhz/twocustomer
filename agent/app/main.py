@@ -1,7 +1,9 @@
 """TwoCustomer agent — FastAPI control plane.
 
-P1: health + SSE /chat backed by the stub LLM so the full web->agent->stream
-path is provable without any API key. P2 swaps the stub for the Claude client.
+Hosts the Claude tool loop, the monitor scheduler, the FDE sandbox, and the
+channel routes (Discord, Deepgram voice, Twilio, Daily). A deterministic stub
+LLM backs the tests and offline dev so the full web->agent->stream path runs
+without any API key; the real Claude client is used whenever a key is present.
 """
 
 from __future__ import annotations
@@ -131,6 +133,9 @@ async def health() -> dict[str, Any]:
         "browserbase": settings.has_browserbase(),
         "gemini": settings.has_gemini(),
         "daily": daily.is_configured(),
+        "deepgram": bool(settings.deepgram_api_key),
+        "discord": bool(settings.discord_bot_token),
+        "twilio": bool(settings.twilio_account_sid and settings.twilio_auth_token),
         "tools": registry.names(),
     }
 
