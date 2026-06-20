@@ -32,13 +32,13 @@ export default function Home() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/70 backdrop-blur">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <span className="text-sm font-semibold tracking-tight">
-            Two<span className="text-emerald-400">Customer</span>
+            Two<span className="text-accent-soft">Customer</span>
           </span>
           <div className="flex items-center gap-3 text-sm">
             <Link href="/sign-in" className="text-white/60 hover:text-white">
               Sign in
             </Link>
-            <Link href="/admin" className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-black hover:bg-emerald-400">
+            <Link href="/admin" className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110">
               Open dashboard
             </Link>
           </div>
@@ -60,17 +60,17 @@ export default function Home() {
           before you miss it.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
-          <Link href="/sign-in" className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-black hover:bg-emerald-400">
+          <Link href="/sign-in" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:brightness-110">
             Sign in →
           </Link>
-          <Link href="/monitor" className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-medium hover:border-emerald-400/50">
+          <Link href="/monitor" className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-medium hover:border-accent-soft/50">
             Watch it work (live feed)
           </Link>
         </div>
         <div className="mt-6 flex gap-10">
           {METRICS.map((m) => (
             <div key={m.l} className="text-center">
-              <div className="text-2xl font-semibold text-emerald-400">{m.v}</div>
+              <div className="text-2xl font-semibold text-accent-soft">{m.v}</div>
               <div className="text-xs text-white/45">{m.l}</div>
             </div>
           ))}
@@ -97,7 +97,7 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-2">
           {FEATURES.map(([t, d]) => (
             <div key={t} className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="font-medium text-emerald-300">{t}</h3>
+              <h3 className="font-medium text-accent-soft">{t}</h3>
               <p className="mt-1 text-sm text-white/60">{d}</p>
             </div>
           ))}
@@ -120,7 +120,7 @@ export default function Home() {
       <Section className="text-center">
         <h2 className="text-3xl font-semibold">Stop flying blind on your data.</h2>
         <p className="mt-2 text-white/55">One agent team. Nine integrations. Working while you sleep.</p>
-        <Link href="/sign-in" className="mt-5 inline-block rounded-lg bg-emerald-500 px-6 py-3 text-sm font-medium text-black hover:bg-emerald-400">
+        <Link href="/sign-in" className="mt-5 inline-block rounded-lg bg-accent px-6 py-3 text-sm font-medium text-white hover:brightness-110">
           Sign in & open the dashboard
         </Link>
       </Section>

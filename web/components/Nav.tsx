@@ -16,7 +16,7 @@ export default function Nav() {
     <header className="sticky top-0 z-20 border-b border-white/10 bg-black/70 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
         <Link href="/" className="text-sm font-semibold tracking-tight">
-          Two<span className="text-emerald-400">Customer</span>
+          Two<span className="text-accent-soft">Customer</span>
         </Link>
         <div className="flex flex-1 items-center gap-4 text-sm text-white/60">
           {LINKS.map((l) => (

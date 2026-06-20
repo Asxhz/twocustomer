@@ -37,7 +37,7 @@ function SignInForm() {
         className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.02] p-7"
       >
         <h1 className="text-xl font-semibold">
-          Two<span className="text-emerald-400">Customer</span>
+          Two<span className="text-accent-soft">Customer</span>
         </h1>
         <p className="mt-1 text-sm text-white/50">Sign in to the brand console.</p>
         <input
@@ -46,12 +46,12 @@ function SignInForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@brand.com"
-          className="mt-5 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-emerald-400/50"
+          className="mt-5 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-accent-soft/60"
         />
         <button
           type="submit"
           disabled={busy}
-          className="mt-3 w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:opacity-50"
+          className="mt-3 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
         >
           {busy ? "Signing in…" : "Continue"}
         </button>

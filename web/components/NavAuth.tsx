@@ -45,7 +45,7 @@ export default function NavAuth() {
       ) : (
         <Link
           href="/sign-in"
-          className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-medium text-black hover:bg-emerald-400"
+          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-white hover:brightness-110"
         >
           Sign in
         </Link>
