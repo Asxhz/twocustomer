@@ -13,6 +13,10 @@ export default defineSchema({
       reddit: v.optional(v.string()),
       linkedin: v.optional(v.string()),
     })),
+    type: v.optional(v.string()),          // "software" | "physical"
+    repoUrl: v.optional(v.string()),
+    discordChannel: v.optional(v.string()),
+    ownerEmail: v.optional(v.string()),    // who owns this project
     createdAt: v.number(),
   }).index("by_slug", ["slug"]),
 

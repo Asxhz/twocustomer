@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
 // Agent tool loops can run well past Vercel's default function limit.
@@ -17,7 +18,11 @@ function sseError(msg: string): Response {
 }
 
 export async function POST(req: Request) {
-  const body = await req.text();
+  const raw = await req.json().catch(() => ({}));
+  // Inject the selected project so the agent is project-aware.
+  const slug = (await cookies()).get("tc_project")?.value;
+  if (slug && !raw.brand_slug) raw.brand_slug = slug;
+  const body = JSON.stringify(raw);
   let upstream: Response;
   try {
     upstream = await fetch(`${AGENT_BASE_URL}/chat`, {

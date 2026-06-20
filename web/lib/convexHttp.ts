@@ -37,9 +37,21 @@ const MOCK_MENTIONS: MentionRow[] = [
   { platform: "reddit", author: "u/cpg_nerd", text: "Anyone else notice Aurora's new can design?", score: 0.55, highSignal: false },
 ];
 
+// The selected project's slug comes from the tc_project cookie (set on
+// sign-in / onboarding / project switch); falls back to the demo brand.
+async function selectedSlug(): Promise<string> {
+  try {
+    const { cookies } = await import("next/headers");
+    return (await cookies()).get("tc_project")?.value || BRAND.slug;
+  } catch {
+    return BRAND.slug;
+  }
+}
+
 async function resolveBrandId(): Promise<string | null> {
+  const slug = await selectedSlug();
   const brand = await convexQuery<{ _id?: string } | null>("brands:getBySlug", {
-    slug: BRAND.slug,
+    slug,
   });
   return brand?._id ?? null;
 }

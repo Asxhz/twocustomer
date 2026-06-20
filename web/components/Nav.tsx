@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NavAuth from "./NavAuth";
+import ProjectPicker from "./ProjectPicker";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard" },
@@ -25,6 +26,7 @@ export default function Nav() {
             </Link>
           ))}
         </div>
+        <ProjectPicker />
         <NavAuth />
       </nav>
     </header>
