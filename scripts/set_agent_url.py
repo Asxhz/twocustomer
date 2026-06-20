@@ -48,6 +48,27 @@ def main() -> int:
                                     "type": "encrypted", "target": [tgt]}, timeout=20)
     print(f"  AGENT_BASE_URL -> {url}")
 
+    # Re-point the Twilio number's webhooks at the new tunnel URL (else inbound
+    # SMS/voice breaks when the tunnel changes).
+    sid = (env.get("TWILIO_ACCOUNT_SID") or "").strip()
+    atok = (env.get("TWILIO_AUTH_TOKEN") or "").strip()
+    if sid and atok:
+        try:
+            nums = httpx.get(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}/IncomingPhoneNumbers.json",
+                auth=(sid, atok), timeout=20).json().get("incoming_phone_numbers", [])
+            for n in nums:
+                httpx.post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{sid}/IncomingPhoneNumbers/{n['sid']}.json",
+                    auth=(sid, atok),
+                    data={"SmsUrl": f"{url}/twilio/sms", "SmsMethod": "POST",
+                          "VoiceUrl": f"{url}/twilio/voice", "VoiceMethod": "POST"},
+                    timeout=20)
+            if nums:
+                print(f"  Twilio webhooks -> {url}/twilio/*")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (twilio webhook update skipped: {exc})")
+
     subprocess.run(
         ["npx", "--yes", "vercel@latest", "deploy", "--prod", "--yes",
          "--token", vtok, "--scope", SCOPE],

@@ -450,6 +450,13 @@ async def fde_fix_ep(req: FixBody) -> dict[str, Any]:
     return await fix_site(req.symptom)
 
 
+@app.get("/discord/context")
+async def discord_context(channel_id: str | None = None, limit: int = 20) -> dict[str, Any]:
+    """Recent messages from the team's Discord channel, as context text."""
+    text = await discord.read_context(channel_id, limit=limit)
+    return {"context": text, "configured": bool(settings.discord_channel_id or channel_id)}
+
+
 class GithubFixBody(BaseModel):
     repo_url: str
     symptom: str
@@ -519,11 +526,22 @@ async def twilio_sms(request: Request) -> Response:
     return Response(twilio.twiml_message(msg), media_type="application/xml")
 
 
+def _external_url(request: Request) -> str:
+    """Reconstruct the public URL Twilio actually called (so the HMAC matches
+    behind a tunnel/proxy, where request.url is the internal localhost URL)."""
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if not host:
+        return str(request.url)
+    q = f"?{request.url.query}" if request.url.query else ""
+    return f"{proto}://{host}{request.url.path}{q}"
+
+
 def _twilio_verified(request: Request, form: dict) -> bool:
     return twilio.verify_signature(
         auth_token=settings.twilio_auth_token,
         signature=request.headers.get("X-Twilio-Signature", ""),
-        url=str(request.url), params={k: str(v) for k, v in form.items()})
+        url=_external_url(request), params={k: str(v) for k, v in form.items()})
 
 
 @app.post("/twilio/voice")

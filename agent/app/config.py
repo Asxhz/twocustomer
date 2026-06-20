@@ -53,6 +53,9 @@ class Settings:
         self.discord_bot_token = os.environ.get("DISCORD_BOT_TOKEN", "")
         self.discord_app_id = os.environ.get("DISCORD_APP_ID", "")
         self.discord_webhook_url = os.environ.get("DISCORD_WEBHOOK_URL", "")
+        # Default guild/channel the agent reads for team context.
+        self.discord_guild_id = os.environ.get("DISCORD_GUILD_ID", "")
+        self.discord_channel_id = os.environ.get("DISCORD_CHANNEL_ID", "")
         # Daily (video + screen-share live sessions)
         self.daily_api_key = os.environ.get("DAILY_API_KEY", "")
         self.daily_domain = os.environ.get("DAILY_DOMAIN", "")

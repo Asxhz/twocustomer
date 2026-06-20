@@ -75,6 +75,46 @@ async def followup(interaction_token: str, content: str) -> None:
         )
 
 
+# ── Inbound: read team context from a channel ─────────────────────────────────
+
+async def list_guilds() -> list[dict[str, Any]]:
+    """Guilds the bot is in (needs DISCORD_BOT_TOKEN)."""
+    s = get_settings()
+    if not s.discord_bot_token:
+        return []
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{_API}/users/@me/guilds",
+                        headers={"Authorization": f"Bot {s.discord_bot_token}"})
+        return r.json() if r.status_code == 200 else []
+
+
+async def read_context(channel_id: str | None = None, *, limit: int = 20) -> str:
+    """Return recent messages from a channel as plain text the agent can use as
+    context. Defaults to DISCORD_CHANNEL_ID. Empty string when unavailable."""
+    s = get_settings()
+    cid = channel_id or s.discord_channel_id
+    if not (s.discord_bot_token and cid):
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(
+                f"{_API}/channels/{cid}/messages",
+                headers={"Authorization": f"Bot {s.discord_bot_token}"},
+                params={"limit": min(limit, 50)})
+        if r.status_code != 200:
+            return ""
+        msgs = r.json()
+    except Exception:  # noqa: BLE001
+        return ""
+    lines = []
+    for m in reversed(msgs):  # oldest first
+        author = m.get("author", {}).get("username", "?")
+        text = (m.get("content") or "").strip()
+        if text:
+            lines.append(f"{author}: {text}")
+    return "\n".join(lines)
+
+
 # ── Outbound: alerts via incoming webhook ─────────────────────────────────────
 
 async def alert(text: str, *, title: str = "High-signal mention",

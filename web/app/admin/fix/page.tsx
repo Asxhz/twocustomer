@@ -110,9 +110,20 @@ export default function FixPanel() {
                   placeholder="e.g. the landing page CTA is broken / copy is off" className={inputCls} />
               </Field>
               <Field label="Extra context (optional — Discord notes, etc.)">
-                <textarea value={ghCtx} onChange={(e) => setGhCtx(e.target.value)} rows={2}
+                <textarea value={ghCtx} onChange={(e) => setGhCtx(e.target.value)} rows={3}
                   placeholder="Paste anything the agent should know." className={inputCls} />
               </Field>
+              <button
+                type="button"
+                onClick={async () => {
+                  const r = await fetch("/api/discord-context");
+                  const d = await r.json();
+                  setGhCtx((c) => (d.context ? (c ? c + "\n" : "") + d.context : c));
+                }}
+                className="self-start rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:border-accent-soft/50 hover:text-white"
+              >
+                ⌁ Pull Discord context
+              </button>
               <div>
                 <Button onClick={runGithub} disabled={ghBusy || !repoUrl.trim()}>
                   {ghBusy ? <Spinner /> : "Clone, diagnose & open PR"}
