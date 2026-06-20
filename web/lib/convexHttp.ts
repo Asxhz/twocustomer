@@ -52,7 +52,9 @@ async function liveOrMock<T>(
   const brandId = await resolveBrandId();
   if (brandId) {
     const rows = await convexQuery<T[]>(path, { brandId, limit: 50 });
-    if (rows) return { rows, live: true };
+    // Only treat as live when there's actual data; an empty live result falls
+    // back to sample rows so a page never renders blank.
+    if (rows && rows.length > 0) return { rows, live: true };
   }
   return { rows: mock, live: false };
 }
