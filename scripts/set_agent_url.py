@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+"""Point the deployed web app at a new agent URL and redeploy.
+
+Updates the Vercel `AGENT_BASE_URL` env on the web project to the given URL
+(all targets) and triggers a production redeploy. Used by demo_up.sh after the
+Cloudflare tunnel URL changes.
+
+    python scripts/set_agent_url.py https://xyz.trycloudflare.com
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import httpx
+from dotenv import dotenv_values
+
+ROOT = Path(__file__).resolve().parents[1]
+SCOPE = "ashs-projects-548e0de1"
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: set_agent_url.py <agent-url>", file=sys.stderr)
+        return 1
+    url = sys.argv[1].rstrip("/")
+    env = dotenv_values(ROOT / ".env")
+    vtok = env.get("VERCEL_TOKEN")
+    if not vtok:
+        print("VERCEL_TOKEN missing in .env", file=sys.stderr)
+        return 1
+    proj = json.loads((ROOT / "web" / ".vercel" / "project.json").read_text())
+    pid = proj["projectId"]
+    h = {"Authorization": f"Bearer {vtok}"}
+
+    # remove existing AGENT_BASE_URL, then set the new value for all targets
+    cur = httpx.get(f"https://api.vercel.com/v9/projects/{pid}/env?teamId={SCOPE}",
+                    headers=h, timeout=20).json().get("envs", [])
+    for e in cur:
+        if e["key"] == "AGENT_BASE_URL":
+            httpx.delete(
+                f"https://api.vercel.com/v9/projects/{pid}/env/{e['id']}?teamId={SCOPE}",
+                headers=h, timeout=20)
+    for tgt in ("production", "preview", "development"):
+        httpx.post(f"https://api.vercel.com/v10/projects/{pid}/env?teamId={SCOPE}",
+                   headers=h, json={"key": "AGENT_BASE_URL", "value": url,
+                                    "type": "encrypted", "target": [tgt]}, timeout=20)
+    print(f"  AGENT_BASE_URL -> {url}")
+
+    subprocess.run(
+        ["npx", "--yes", "vercel@latest", "deploy", "--prod", "--yes",
+         "--token", vtok, "--scope", SCOPE],
+        cwd=str(ROOT / "web"), check=False)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
