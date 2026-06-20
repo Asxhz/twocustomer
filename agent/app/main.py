@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -44,11 +45,17 @@ obs.init_sentry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.monitor.scheduler import build_scheduler
+    # The background monitor scheduler only runs on a long-lived host. On
+    # serverless (Vercel), skip it — request endpoints still work, and the
+    # monitor cadence runs from a real always-on deployment.
+    serverless = bool(os.environ.get("VERCEL"))
+    sched = None
+    if not serverless:
+        from app.monitor.scheduler import build_scheduler
 
-    sched = build_scheduler()
-    sched.start()
-    app.state.scheduler = sched
+        sched = build_scheduler()
+        sched.start()
+        app.state.scheduler = sched
     # repopulate the scheduler with persisted monitor configs (survive restart)
     try:
         from app.monitor.config import all_configs
@@ -61,10 +68,15 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        sched.shutdown(wait=False)
+        if sched is not None:
+            sched.shutdown(wait=False)
 
 
-app = FastAPI(title="TwoCustomer Agent", version="0.1.0", lifespan=lifespan)
+# On serverless (Vercel), skip the lifespan entirely — its only jobs are the
+# background scheduler (not viable serverless) and config preload. Vercel's ASGI
+# wrapper is also unreliable with the lifespan protocol.
+_LIFESPAN = None if os.environ.get("VERCEL") else lifespan
+app = FastAPI(title="TwoCustomer Agent", version="0.1.0", lifespan=_LIFESPAN)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
