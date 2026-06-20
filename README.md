@@ -84,3 +84,4 @@ cd agent && .venv/bin/python -m pytest -q   # control plane
 cd web && pnpm build                        # web routes
 cd uagent && python3 -m pytest tests        # intent parser
 ```
+Made by Ashmit Sethi & Dhruv Bhadauriya
