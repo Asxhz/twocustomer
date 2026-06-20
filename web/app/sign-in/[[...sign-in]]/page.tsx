@@ -1,25 +1,33 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 function SignInForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/admin";
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim() || "founder@twocustomer.app" }),
-    });
-    router.push(next);
-    router.refresh();
+    setErr("");
+    try {
+      const r = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() || "founder@twocustomer.app" }),
+      });
+      if (!r.ok) throw new Error("Sign-in failed");
+      // Hard navigation so the browser sends the freshly-set cookie on the next
+      // request — avoids a client-router race where the gate redirects back.
+      window.location.assign(next);
+    } catch {
+      setErr("Sign-in failed — try again.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -47,6 +55,7 @@ function SignInForm() {
         >
           {busy ? "Signing in…" : "Continue"}
         </button>
+        {err && <p className="mt-2 text-center text-xs text-red-400">{err}</p>}
         <p className="mt-3 text-center text-xs text-white/30">
           We&apos;ll set up your brand workspace on first sign-in.
         </p>
