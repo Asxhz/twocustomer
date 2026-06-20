@@ -62,6 +62,11 @@ class Settings:
         self.twilio_from_number = os.environ.get("TWILIO_FROM_NUMBER", "")
         # Vercel (FDE sandbox preview deploys)
         self.vercel_token = os.environ.get("VERCEL_TOKEN", "")
+        # Team/scope slug — the Vercel CLI requires it in non-interactive mode.
+        self.vercel_scope = os.environ.get("VERCEL_SCOPE", "")
+        # Reddit OAuth (script app: reddit.com/prefs/apps) for .json monitoring
+        self.reddit_client_id = os.environ.get("REDDIT_CLIENT_ID", "")
+        self.reddit_client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
         # wiring
         self.agent_base_url = os.environ.get("AGENT_BASE_URL", "http://localhost:8000")
         self.web_base_url = os.environ.get("WEB_BASE_URL", "http://localhost:3000")

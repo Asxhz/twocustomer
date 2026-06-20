@@ -99,22 +99,14 @@ async def news_search(query: str, *, limit: int = 10) -> list[Mention]:
 
 
 async def reddit_search(query: str, *, limit: int = 10) -> list[Mention]:
-    """Search Reddit. Reddit blocks unauthenticated HTTP clients (403), so this
-    routes through a real Browserbase browser when keys are present. Without
-    Browserbase configured it returns [] (no fake data) — HN carries the
-    keyless demo."""
-    from urllib.parse import urlencode
+    """Search Reddit via its OAuth API (the only path that works — Reddit 403s
+    all unauthenticated access). Reads the same JSON shape as the public
+    ``.json`` endpoints. Returns [] without REDDIT_CLIENT_ID/SECRET — never
+    fabricated."""
+    from app.state import reddit
 
-    from app.state.browserbase import fetch_json
-
-    params = {"q": query, "limit": str(limit), "sort": "new", "raw_json": "1"}
-    url = f"https://www.reddit.com/search.json?{urlencode(params)}"
     out: list[Mention] = []
-    data = await fetch_json(url)
-    if not isinstance(data, dict):
-        return out
-    for child in data.get("data", {}).get("children", []):
-        d = child.get("data", {})
+    for d in await reddit.search(query, limit=limit):
         out.append(
             normalize(
                 "reddit",
@@ -130,9 +122,9 @@ async def reddit_search(query: str, *, limit: int = 10) -> list[Mention]:
 
 
 # Default scrapers:
-#   hn_search   — keyless, always live (Algolia)
-#   news_search — live via Browserbase (Google News RSS); [] without keys
-# reddit_search is intentionally NOT default: Reddit hard-blocks datacenter IPs,
-# so it needs a Browserbase residential proxy (paid). It stays callable for
-# deployments on that tier. Nothing is ever fabricated.
-DEFAULT_SCRAPERS = [hn_search, news_search]
+#   hn_search     — keyless, always live (Algolia)
+#   news_search   — live via Browserbase (Google News RSS); [] without keys
+#   reddit_search — live via the Reddit OAuth API; [] without REDDIT_CLIENT_ID/
+#                   SECRET (Reddit 403s all unauthenticated access)
+# Nothing is ever fabricated — a source with no key simply yields nothing.
+DEFAULT_SCRAPERS = [hn_search, news_search, reddit_search]

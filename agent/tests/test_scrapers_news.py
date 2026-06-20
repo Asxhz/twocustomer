@@ -46,8 +46,10 @@ def test_news_search_empty_without_browserbase(monkeypatch):
     assert asyncio.run(scrapers.news_search("aurora")) == []
 
 
-def test_news_not_default_fabricated():
-    # reddit is intentionally excluded from defaults; news + hn only.
-    from app.monitor.scrapers import DEFAULT_SCRAPERS, hn_search, news_search
+def test_news_in_defaults():
+    # hn + news + reddit; each yields nothing without its key (never fabricated).
+    from app.monitor.scrapers import (
+        DEFAULT_SCRAPERS, hn_search, news_search, reddit_search,
+    )
 
-    assert DEFAULT_SCRAPERS == [hn_search, news_search]
+    assert DEFAULT_SCRAPERS == [hn_search, news_search, reddit_search]

@@ -100,13 +100,16 @@ async def diagnose(files: dict[str, str], symptom: str) -> dict[str, Any]:
 
 async def vercel_deploy(sandbox: Path) -> str | None:
     """Deploy a Vercel preview if VERCEL_TOKEN is set; else None."""
-    token = get_settings().vercel_token
+    s = get_settings()
+    token = s.vercel_token
     if not token:
         return None
+    args = ["npx", "--yes", "vercel", "deploy", "--yes", "--token", token]
+    if s.vercel_scope:  # the CLI needs an explicit scope when non-interactive
+        args += ["--scope", s.vercel_scope]
     try:
         proc = await asyncio.create_subprocess_exec(
-            "npx", "--yes", "vercel", "deploy", "--yes", "--token", token,
-            cwd=str(sandbox), stdout=asyncio.subprocess.PIPE,
+            *args, cwd=str(sandbox), stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT)
         out, _ = await proc.communicate()
         urls = re.findall(r"https://\S+\.vercel\.app", out.decode())
