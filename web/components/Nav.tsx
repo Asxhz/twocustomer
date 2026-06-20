@@ -7,8 +7,8 @@ const LINKS = [
   { href: "/admin/campaigns", label: "Campaigns" },
   { href: "/admin/fix", label: "Fix" },
   { href: "/admin/studio", label: "Studio" },
-  { href: "/session/live/video", label: "Live" },
-  { href: "/integrations", label: "Integrations" },
+  { href: "/monitor", label: "Monitor" },
+  { href: "/status", label: "Status" },
 ];
 
 export default function Nav() {
