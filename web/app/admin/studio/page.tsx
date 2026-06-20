@@ -7,7 +7,7 @@ import { Badge, Button, Card, Field, inputCls, Spinner } from "@/components/ui";
 export default function Studio() {
   const [instruction, setInstruction] = useState("A clean, minimal studio product photo of a silver concert flute on a white background");
   const [imageUrl, setImageUrl] = useState("");
-  const [out, setOut] = useState<{ url?: string | null; message?: string } | null>(null);
+  const [out, setOut] = useState<{ url?: string | null; data_url?: string | null; message?: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function run() {
@@ -57,11 +57,11 @@ export default function Studio() {
 
           <Card className="flex min-h-72 items-center justify-center">
             {!out && <span className="text-sm text-white/40">Result appears here</span>}
-            {out?.url && (
+            {(out?.data_url || out?.url) && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={out.url} alt="result" className="max-h-[28rem] rounded-lg" />
+              <img src={out.data_url || out.url || ""} alt="result" className="max-h-[28rem] rounded-lg" />
             )}
-            {out && !out.url && (
+            {out && !out.data_url && !out.url && (
               <span className="text-sm text-amber-200">{out.message}</span>
             )}
           </Card>

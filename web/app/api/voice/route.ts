@@ -1,5 +1,7 @@
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
+export const maxDuration = 300;
+
 // Proxy recorded audio to the agent's Deepgram STT endpoint, return transcript.
 export async function POST(req: Request) {
   const audio = await req.arrayBuffer();

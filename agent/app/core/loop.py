@@ -8,13 +8,17 @@ goes through the ToolRegistry; results are fed back as user/tool messages.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from app.llm.base import LLMClient
 from app.llm.budget import trim_messages
 from app.tools.registry import ToolRegistry
 
 MAX_TOOL_ROUNDS = 6
+
+# Async callback the loop calls with (event_name, data) so callers can stream
+# progress live: "status" | "tool_start" | "tool_end".
+EventFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
 @dataclass
@@ -32,18 +36,31 @@ async def run_agent(
     messages: list[dict[str, Any]],
     context: dict[str, Any] | None = None,
     max_rounds: int = MAX_TOOL_ROUNDS,
+    on_event: EventFn | None = None,
 ) -> AgentResult:
     """Run the tool-calling loop until the model returns final text.
 
     `messages` is the running conversation in Anthropic shape
     ([{role, content}]). It is mutated in place with assistant/tool turns so the
     caller can persist the full transcript.
+
+    If `on_event` is given, the loop streams progress: "status" at each round,
+    "tool_start"/"tool_end" around each tool call — so the UI shows live activity
+    instead of a frozen spinner.
     """
     ctx = context or {}
     tool_specs = registry.specs()
     tool_log: list[dict[str, Any]] = []
 
+    async def emit(ev: str, data: dict[str, Any]) -> None:
+        if on_event is not None:
+            try:
+                await on_event(ev, data)
+            except Exception:  # noqa: BLE001 - never let streaming break the loop
+                pass
+
     for round_i in range(1, max_rounds + 1):
+        await emit("status", {"text": "Thinking…", "round": round_i})
         # Cap context so long tool loops never blow the window.
         sent = trim_messages(messages, max_chars=600_000)
         resp = await llm.complete(system=system, messages=sent, tools=tool_specs)
@@ -66,8 +83,10 @@ async def run_agent(
         # Execute tools, append a single user turn with all tool_results.
         results_content: list[dict[str, Any]] = []
         for call in resp.tool_calls:
+            await emit("tool_start", {"name": call.name})
             output = await registry.dispatch(call.name, call.input, **ctx)
             tool_log.append({"name": call.name, "input": call.input, "output": output})
+            await emit("tool_end", {"name": call.name, "output": output})
             results_content.append(
                 {"type": "tool_result", "tool_use_id": call.id, "content": output}
             )

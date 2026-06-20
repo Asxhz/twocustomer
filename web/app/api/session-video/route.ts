@@ -1,5 +1,7 @@
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
+export const maxDuration = 300;
+
 // Ask the agent to create a Daily room (video + screen share) and return it.
 export async function POST() {
   try {

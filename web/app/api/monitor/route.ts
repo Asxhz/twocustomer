@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
+export const maxDuration = 300;
+
 // Persist a brand's monitor config to the agent control plane (which writes it
 // to Redis and arms the scheduler). Called from onboarding "Arm monitors".
 export async function POST(req: Request) {

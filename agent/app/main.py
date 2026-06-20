@@ -193,52 +193,83 @@ async def chat(req: ChatRequest) -> EventSourceResponse:
         if not await allow(f"chat:{req.participant}", limit=60, window_s=60):
             yield {"event": "error",
                    "data": json.dumps({"error": "Rate limit — slow down a moment."})}
+            yield {"event": "message",
+                   "data": json.dumps({"text": "⚠ Rate limit — give it a sec.", "rounds": 0})}
             yield {"event": "done", "data": "{}"}
             return
         llm = get_llm()
         await history.append(req.participant, "user", req.message)
-        try:
-            with obs.Timer() as t:
-                result = await run_agent(
-                    llm=llm,
-                    registry=registry,
-                    system=SYSTEM_PROMPT,
-                    messages=messages,
-                    context={"participant": req.participant},
+
+        # Run the agent in the background; stream its progress events live so the
+        # UI shows tool activity immediately instead of a frozen spinner.
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def on_event(ev: str, data: dict[str, Any]) -> None:
+            await queue.put((ev, data))
+
+        async def run() -> None:
+            try:
+                with obs.Timer() as t:
+                    res = await run_agent(
+                        llm=llm, registry=registry, system=SYSTEM_PROMPT,
+                        messages=messages, context={"participant": req.participant},
+                        on_event=on_event,
+                    )
+                obs.trace_agent_run(
+                    participant=req.participant, rounds=res.rounds,
+                    tools=[e["name"] for e in res.tool_log], duration_ms=t.ms,
                 )
-            obs.trace_agent_run(
-                participant=req.participant, rounds=result.rounds,
-                tools=[e["name"] for e in result.tool_log], duration_ms=t.ms,
-            )
-        except Exception as exc:  # noqa: BLE001 - surface to UI, never 500
-            obs.capture(exc)
-            msg = str(exc)
+                await queue.put(("__done__", res))
+            except Exception as exc:  # noqa: BLE001 - surface to UI, never 500
+                obs.capture(exc)
+                await queue.put(("__error__", exc))
+
+        task = asyncio.create_task(run())
+        result = None
+        error = None
+        while True:
+            ev, data = await queue.get()
+            if ev == "__done__":
+                result = data
+                break
+            if ev == "__error__":
+                error = data
+                break
+            out = dict(data)
+            if ev == "tool_end" and isinstance(out.get("output"), str):
+                out["output"] = out["output"][:400]
+            yield {"event": ev, "data": json.dumps(out)}
+
+        if error is not None:
+            msg = str(error)
             hint = ("Anthropic credit balance is too low — add credits or set a "
                     "funded ANTHROPIC_API_KEY." if "credit balance" in msg else msg)
             yield {"event": "error", "data": json.dumps({"error": hint})}
+            yield {"event": "message",
+                   "data": json.dumps({"text": f"⚠ {hint}", "rounds": 0})}
             yield {"event": "done", "data": "{}"}
             return
+
+        # Surface artifacts (packet / generated image) from the tool log.
         for entry in result.tool_log:
-            yield {"event": "tool_end",
-                   "data": json.dumps({"name": entry["name"],
-                                       "output": entry["output"][:400]})}
-            # Surface a packet artifact when propose_fix ran.
             if entry["name"] == "propose_fix":
                 yield {"event": "artifact",
-                       "data": json.dumps({"kind": "packet",
-                                           "text": entry["output"]})}
-            # Surface the image when edit_product_image ran.
+                       "data": json.dumps({"kind": "packet", "text": entry["output"]})}
             if entry["name"] == "edit_product_image" and "/assets/" in entry["output"]:
                 url = entry["output"].split("/assets/", 1)[1].split(" ", 1)[0]
                 yield {"event": "artifact",
-                       "data": json.dumps({"kind": "image",
-                                           "url": f"/assets/{url}"})}
-        await history.append(req.participant, "assistant", result.text)
-        # Stream the final answer token-by-token for a live-typing UX.
-        for word in result.text.split(" "):
+                       "data": json.dumps({"kind": "image", "url": f"/assets/{url}"})}
+
+        # Always send a final message so the chat is never blank.
+        text = result.text or (
+            "Done. Tell me a specific action — monitor a brand, build a campaign, "
+            "fix a site, or edit an image — and I'll run it."
+        )
+        await history.append(req.participant, "assistant", text)
+        for word in text.split(" "):
             yield {"event": "token", "data": json.dumps({"text": word + " "})}
         yield {"event": "message",
-               "data": json.dumps({"text": result.text, "rounds": result.rounds})}
+               "data": json.dumps({"text": text, "rounds": result.rounds})}
         yield {"event": "done", "data": "{}"}
 
     return EventSourceResponse(event_gen())
@@ -402,7 +433,8 @@ async def edit_image_ep(req: EditImageBody) -> dict[str, Any]:
     url = None
     if "/assets/" in out:
         url = "/assets/" + out.split("/assets/", 1)[1].split(" ", 1)[0]
-    return {"message": out, "url": url}
+    # data_url renders inline in the UI — no second /assets request (serverless-safe).
+    return {"message": out, "url": url, "data_url": edit_image.data_url_for(url)}
 
 
 class FixBody(BaseModel):

@@ -27,6 +27,13 @@ _BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 # id -> (mime, bytes). In-process asset store; served by /assets/{id}.
 ASSETS: dict[str, tuple[str, bytes]] = {}
 LAST_IMAGE: dict[str, str] = {}  # participant/brand -> last asset url
+# asset url -> data: URL (base64). Lets the UI render the image inline without a
+# second request — survives serverless where the in-memory ASSETS store can't.
+DATA_URLS: dict[str, str] = {}
+
+
+def data_url_for(url: str | None) -> str | None:
+    return DATA_URLS.get(url) if url else None
 
 
 def is_configured() -> bool:
@@ -128,4 +135,7 @@ async def edit_product_image(instruction: str, image_url: str | None = None,
         return f"Image edit failed: {exc}"
     url = _store(res_mime, data)
     LAST_IMAGE[participant] = url
+    DATA_URLS[url] = f"data:{res_mime};base64,{base64.b64encode(data).decode()}"
+    while len(DATA_URLS) > _ASSET_CAP:
+        DATA_URLS.pop(next(iter(DATA_URLS)))
     return f"Image ready: {url} ({len(data)} bytes) — {instruction}"

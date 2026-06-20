@@ -1,5 +1,8 @@
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
+// Agent tool loops can run well past Vercel's default function limit.
+export const maxDuration = 300;
+
 // Proxy the browser's chat request to the agent control plane and stream the
 // agent's SSE response straight back. Keeps the agent URL/token server-side.
 function sseError(msg: string): Response {

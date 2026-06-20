@@ -1,5 +1,7 @@
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
 
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const body = await req.text();
   try {
