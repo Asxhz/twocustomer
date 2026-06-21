@@ -17,9 +17,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Admins only." }, { status: 403 });
   }
   const incoming = await req.json().catch(() => ({}));
-  if (!incoming.repo_url) {
-    return Response.json({ error: "No repo connected. Add a software project with a repo first." });
-  }
+  // repo_url may be empty — the agent falls back to the hardcoded demo repo.
   if (session.companyId && !incoming.github_token) {
     const company = await convexQuery<CompanyRow | null>("companies:get", { id: session.companyId });
     if (company?.githubTokenEnc) {

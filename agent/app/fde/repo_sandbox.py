@@ -65,6 +65,7 @@ async def fix_connected_repo(
     s = get_settings()
     if not s.has_anthropic():
         return {"error": "ANTHROPIC_API_KEY not set — can't diagnose."}
+    repo_url = (repo_url or "").strip() or s.demo_repo  # fall back to the demo repo
     parsed = github.parse_repo(repo_url)
     if not parsed:
         return {"error": "Not a valid public github.com repo URL."}

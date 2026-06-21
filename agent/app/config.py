@@ -72,6 +72,8 @@ class Settings:
         self.reddit_client_secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
         # GitHub token (repo scope) — lets the FDE open a PR with its fix.
         self.github_token = os.environ.get("GITHUB_TOKEN", "")
+        # Fallback demo repo used by the FDE when a project has no repo connected.
+        self.demo_repo = os.environ.get("DEMO_REPO", "https://github.com/Asxhz/demoproj")
         # wiring
         self.agent_base_url = os.environ.get("AGENT_BASE_URL", "http://localhost:8000")
         self.web_base_url = os.environ.get("WEB_BASE_URL", "http://localhost:3000")

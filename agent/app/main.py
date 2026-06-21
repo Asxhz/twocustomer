@@ -640,14 +640,11 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
         except Exception:  # noqa: BLE001
             pass
 
-    if not (brand and brand.get("repoUrl")):
-        return ("Logged it and sent the reporter a call + join link. No repo is "
-                "connected for this brand yet; the founder can add one in Settings.")
-
+    repo_url = (brand.get("repoUrl") if brand else "") or settings.demo_repo
     token = decrypt_secret(company.get("githubTokenEnc", "") or "") or ""
     from app.fde.repo_sandbox import fix_connected_repo
 
-    res = await fix_connected_repo(brand["repoUrl"], reported, token=token)
+    res = await fix_connected_repo(repo_url, reported, token=token)
     if res.get("error"):
         if user_id:
             await discord.dm(user_id, f"I hit a snag on the fix: {res['error']}")
@@ -875,6 +872,7 @@ async def start_agent_call(brand_slug: str) -> dict[str, Any]:
                 if company and company.get("githubTokenEnc"):
                     github_token = decrypt_secret(company["githubTokenEnc"]) or ""
 
+    repo_url = repo_url or settings.demo_repo  # hardcoded demo repo fallback
     room = await daily.create_room()
     if not room:
         return {"error": "DAILY_API_KEY not set", "room_url": None}
