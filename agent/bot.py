@@ -23,10 +23,9 @@ from discord import app_commands
 from app.config import get_settings
 
 S = get_settings()
-# Default to the deployed agent (always up) so the bot is reliable; override with
-# AGENT_BASE_URL=http://localhost:8000 when running everything locally.
-_DEFAULT_AGENT = "https://twocustomer-agent-ashs-projects-548e0de1.vercel.app"
-AGENT = (os.environ.get("AGENT_BASE_URL") or _DEFAULT_AGENT).rstrip("/")
+# Use the local agent by default (shares this machine's AGENT_SHARED_TOKEN and the
+# local voice control, so the agent can join calls). Override with AGENT_BASE_URL.
+AGENT = (os.environ.get("AGENT_BASE_URL") or S.agent_base_url or "http://localhost:8000").rstrip("/")
 GUILD_ID = os.environ.get("DISCORD_GUILD_ID") or S.discord_guild_id
 
 
