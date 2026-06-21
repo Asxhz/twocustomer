@@ -281,9 +281,9 @@ async def chat(req: ChatRequest) -> EventSourceResponse:
 
         if not await allow(f"chat:{req.participant}", limit=60, window_s=60):
             yield {"event": "error",
-                   "data": json.dumps({"error": "Rate limit — slow down a moment."})}
+                   "data": json.dumps({"error": "Too many requests. Slow down a moment."})}
             yield {"event": "message",
-                   "data": json.dumps({"text": "⚠ Rate limit — give it a sec.", "rounds": 0})}
+                   "data": json.dumps({"text": "Too many requests. Give it a moment.", "rounds": 0})}
             yield {"event": "done", "data": "{}"}
             return
         llm = get_llm()

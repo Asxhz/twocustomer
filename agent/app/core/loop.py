@@ -60,7 +60,7 @@ async def run_agent(
                 pass
 
     for round_i in range(1, max_rounds + 1):
-        await emit("status", {"text": "Thinking…", "round": round_i})
+        await emit("status", {"text": "Working", "round": round_i})
         # Cap context so long tool loops never blow the window.
         sent = trim_messages(messages, max_chars=600_000)
         resp = await llm.complete(system=system, messages=sent, tools=tool_specs)
