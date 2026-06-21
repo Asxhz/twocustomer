@@ -32,11 +32,20 @@ BLOCKED = {".env", ".env.local"}
 
 
 def prepare_sandbox(src: Path = TARGET_SITE) -> Path:
-    """Copy the target into a fresh temp dir (the isolated sandbox)."""
+    """Copy the target into a fresh temp dir (the isolated sandbox). When the
+    folder isn't bundled (e.g. on Vercel serverless), write the embedded demo
+    site instead so the sandbox FDE always works."""
     tmp = Path(tempfile.mkdtemp(prefix="twocustomer-fde-"))
-    dst = tmp / src.name
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
-        "node_modules", ".git", ".next", ".env", ".env.*"))
+    dst = tmp / "sandbox-site"
+    if src.exists():
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(
+            "node_modules", ".git", ".next", ".env", ".env.*"))
+    else:
+        from .demo_site import FILES
+
+        dst.mkdir(parents=True)
+        for name, content in FILES.items():
+            (dst / name).write_text(content, encoding="utf-8")
     return dst
 
 
