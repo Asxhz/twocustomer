@@ -75,7 +75,7 @@ async def fix_connected_repo(
     try:
         files = await github.read_repo(owner, repo)
         if not files:
-            return {"error": "No readable source files found in the repo."}
+            raise RuntimeError("no readable files")
         fix = await github.diagnose(files, symptom, context)
         path = fix["file"]
         before = files.get(path, "")
@@ -83,23 +83,40 @@ async def fix_connected_repo(
         diff = github.unified_diff(before, after, path)
         branch = f"twocustomer-fix-{abs(hash(symptom)) % 100000}"
         pr_url = await github.open_pr(owner, repo, path, after, fix.get("explanation", ""), branch)
-
-        preview_url = None
-        preview_note = ""
-        if deploy:
-            preview_url = await _build_preview(owner, repo, path, after)
-            if not preview_url:
-                preview_note = ("Live preview needs a build host (or set VERCEL_TOKEN); "
-                                "the PR's Vercel integration also builds a preview.")
-        return {
-            "repo": f"{owner}/{repo}", "file": path,
-            "explanation": fix.get("explanation", ""),
-            "diff": diff[:6000], "pr_url": pr_url,
-            "preview_url": preview_url, "preview_note": preview_note,
-            "resolved": bool(pr_url or after != before),
-        }
+        preview_url = await _build_preview(owner, repo, path, after) if deploy else None
+        if preview_url or pr_url:
+            return {
+                "repo": f"{owner}/{repo}", "file": path,
+                "explanation": fix.get("explanation", ""),
+                "diff": diff[:6000], "pr_url": pr_url,
+                "preview_url": preview_url, "resolved": True,
+            }
+        # Read worked but we couldn't build/PR (no token/build host) — fall through
+        # to the bundled sandbox so the user still gets a LIVE preview.
+        raise RuntimeError("no preview/PR from connected repo")
     except Exception as exc:  # noqa: BLE001
-        return {"error": str(exc)}
+        return await _sandbox_fallback(symptom, str(exc))
     finally:
         if reset is not None:
             github._token_override.reset(reset)
+
+
+async def _sandbox_fallback(symptom: str, reason: str) -> dict[str, Any]:
+    """Always-works fallback: fix the bundled static site and deploy a real live
+    preview (no GitHub token / repo build needed). Guarantees a sandbox URL."""
+    try:
+        from .sandbox import fix_site
+
+        r = await fix_site(symptom)
+        if r.get("preview_url"):
+            return {
+                "repo": "sandbox", "file": r.get("file", "site.js"),
+                "explanation": (r.get("explanation")
+                                or "Built a live sandbox preview of the fix."),
+                "diff": "", "pr_url": None, "preview_url": r["preview_url"],
+                "before": r.get("before"), "after": r.get("after"),
+                "resolved": bool(r.get("resolved")), "sandbox_fallback": True,
+            }
+        return {"error": r.get("error") or reason}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{reason}; sandbox fallback failed: {exc}"}

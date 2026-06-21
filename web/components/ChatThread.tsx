@@ -63,7 +63,16 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
           setStatus((parsed.text as string) || "Working…");
         } else if (event === "tool_start") {
           const name = parsed.name as string;
-          setStatus(`Running ${name}…`);
+          const friendly: Record<string, string> = {
+            fix_connected_repo: "Building the fix in a sandbox…",
+            fix_site: "Building a live preview…",
+            fix_github: "Diagnosing the repo…",
+            research_product: "Searching live signal…",
+            monitor_brand: "Scanning mentions…",
+            edit_product_image: "Generating the image…",
+            request_call: "Setting up a call…",
+          };
+          setStatus(friendly[name] || `Running ${name}…`);
           setTools((t) =>
             t.some((x) => x.name === name && !x.done)
               ? t
