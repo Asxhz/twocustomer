@@ -45,8 +45,11 @@ class ClaudeLLM(LLMClient):
             "system": [{"type": "text", "text": system,
                         "cache_control": {"type": "ephemeral"}}],
             "messages": messages,
-            "output_config": {"effort": "medium"},
         }
+        # The effort/output_config knob is only supported by some models (not
+        # Haiku) — sending it to Haiku 400s. Include it only where supported.
+        if "haiku" not in self._model.lower():
+            kwargs["output_config"] = {"effort": "medium"}
         if tools:
             kwargs["tools"] = tools
         return kwargs
