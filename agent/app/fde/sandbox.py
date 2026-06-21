@@ -99,21 +99,53 @@ async def diagnose(files: dict[str, str], symptom: str) -> dict[str, Any]:
 
 
 async def vercel_deploy(sandbox: Path) -> str | None:
-    """Deploy a Vercel preview if VERCEL_TOKEN is set; else None."""
+    """Deploy a live Vercel preview via the REST API (pure HTTP — works on
+    serverless, no CLI). Reads the sandbox files inline, deploys, waits briefly
+    for READY, returns the URL. None if no token or it fails."""
+    import base64
+
+    import httpx
+
     s = get_settings()
     token = s.vercel_token
     if not token:
         return None
-    args = ["npx", "--yes", "vercel", "deploy", "--yes", "--token", token]
-    if s.vercel_scope:  # the CLI needs an explicit scope when non-interactive
-        args += ["--scope", s.vercel_scope]
+    # Collect allow-listed files (small static site).
+    files = []
+    for p in sorted(sandbox.rglob("*")):
+        if p.is_file() and p.suffix in ALLOWED_EXT and p.name not in BLOCKED:
+            rel = str(p.relative_to(sandbox))
+            files.append({"file": rel,
+                          "data": base64.b64encode(p.read_bytes()).decode(),
+                          "encoding": "base64"})
+    if not files:
+        return None
+    qs = f"?slug={s.vercel_scope}" if s.vercel_scope else ""
+    body = {"name": "tc-sandbox", "files": files,
+            "projectSettings": {"framework": None}, "target": "production"}
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *args, cwd=str(sandbox), stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT)
-        out, _ = await proc.communicate()
-        urls = re.findall(r"https://\S+\.vercel\.app", out.decode())
-        return urls[-1] if urls else None
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(f"https://api.vercel.com/v13/deployments{qs}", json=body,
+                             headers={"Authorization": f"Bearer {token}"})
+            if r.status_code not in (200, 201, 202):
+                return None
+            dep = r.json()
+            url = dep.get("url")
+            dep_id = dep.get("id")
+            if not url:
+                return None
+            # Poll readiness so the link works the moment we hand it over.
+            for _ in range(20):
+                rs = await c.get(
+                    f"https://api.vercel.com/v13/deployments/{dep_id}{qs}",
+                    headers={"Authorization": f"Bearer {token}"})
+                state = rs.json().get("readyState") if rs.status_code == 200 else None
+                if state == "READY":
+                    break
+                if state in ("ERROR", "CANCELED"):
+                    return None
+                await asyncio.sleep(1.5)
+            return f"https://{url}"
     except Exception:  # noqa: BLE001
         return None
 
