@@ -126,8 +126,13 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
             announce_text = (f"I am back. I could not make that change: {res['error']}. "
                              "Tell me again and I will retry.")
         else:
-            announce_text = ("I am back. " + (res.get("explanation") or "Done.")
-                             + " The live preview link is in the chat.")
+            has_pr = bool(res.get("pr_url"))
+            guide = ("I opened a pull request and built a live preview. "
+                     "Check the pull request on GitHub and open the preview on Vercel. "
+                     "Both links are in the chat." if has_pr else
+                     "I built a live preview. Open the preview link in the chat to check it.")
+            announce_text = ("I am back. I found the issue and fixed it. "
+                             + (res.get("explanation") or "") + " " + guide)
         # Rejoin the same room with the result. If rejoin is unavailable, the link
         # is still recorded for the UI panel, so nothing is lost.
         if rejoin is not None:
@@ -179,11 +184,12 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
         if announce:
             # Rejoin session: post the link, speak the result, then keep listening.
             links = []
-            if preview_url:
-                links.append(f"Live preview: {preview_url}")
             if pr_url:
-                links.append(f"PR: {pr_url}")
+                links.append(f"Pull request (GitHub): {pr_url}")
+            if preview_url:
+                links.append(f"Live preview (Vercel): {preview_url}")
             if links:
+                links.append("Open these to review the fix. Production was not touched.")
                 await _chat("\n".join(links))
             await task.queue_frames([TTSSpeakFrame(announce), LLMRunFrame()])
         else:
