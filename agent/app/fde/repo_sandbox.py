@@ -60,8 +60,14 @@ async def _download_tarball(owner: str, repo: str, ref: str | None = None) -> Pa
 async def _build_preview(owner: str, repo: str, edits: list[dict[str, str]],
                          ref: str | None = None) -> str | None:
     """Materialize the repo (at `ref` if given) + apply every edit + deploy a
-    Vercel preview. Best-effort — returns None on any failure."""
+    Vercel preview. Best-effort — returns None on any failure.
+
+    Backup: if the branch tarball is not ready yet (GitHub lag right after a
+    push), fall back to the default-branch tree and apply the edits in memory, so
+    the preview still reflects the change."""
     root = await _download_tarball(owner, repo, ref)
+    if root is None and ref is not None:
+        root = await _download_tarball(owner, repo, None)  # backup: default branch
     if root is None:
         return None
     try:

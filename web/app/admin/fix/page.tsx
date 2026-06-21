@@ -281,11 +281,11 @@ export default function FixPanel() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
                         <div className="mb-1 text-xs uppercase text-white/40">Before</div>
-                        <pre className="rounded-lg border border-red-400/20 bg-black/40 p-3 text-xs text-red-200">{res.before}</pre>
+                        <pre className="rounded-lg border border-red-400/20 bg-black/40 p-3 text-xs text-foreground/80">{res.before}</pre>
                       </div>
                       <div>
                         <div className="mb-1 text-xs uppercase text-white/40">After</div>
-                        <pre className="rounded-lg border border-accent/20 bg-black/40 p-3 text-xs text-accent-soft">{res.after}</pre>
+                        <pre className="rounded-lg border border-accent/20 bg-black/40 p-3 text-xs text-foreground/80">{res.after}</pre>
                       </div>
                     </div>
                     {res.preview_url && (
