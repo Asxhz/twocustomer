@@ -3,6 +3,7 @@ import NavAuth from "./NavAuth";
 import NavBell from "./NavBell";
 import NavTools from "./NavTools";
 import ProjectPicker from "./ProjectPicker";
+import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard" },
@@ -27,6 +28,7 @@ export default function Nav() {
         </div>
         <ProjectPicker />
         <NavBell />
+        <ThemeToggle />
         <NavAuth />
       </nav>
     </header>

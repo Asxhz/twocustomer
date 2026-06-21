@@ -31,12 +31,18 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body
-        suppressHydrationWarning
-        className="min-h-full flex flex-col bg-black text-white"
-      >
+      <head>
+        {/* No-flash theme init: apply the saved theme before first paint.
+            Dark-first — only switch to light if the user previously chose it. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('tc-theme');var d=document.documentElement;d.classList.remove('dark','light');d.classList.add(t==='light'?'light':'dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
       </body>
     </html>

@@ -1,36 +1,121 @@
 @import "tailwindcss";
 
-:root {
-  --background: #08080c;
-  --foreground: #ededf2;
-  /* Brand accent (blue). Status colors (red/amber) stay semantic. */
-  --accent: #3b82f6;
-  --accent-soft: #60a5fa;
-}
+/* ── Theming ────────────────────────────────────────────────────────────────
+   The app was authored with white/black-based neutrals (text-white, bg-black,
+   white/10, …). Rather than rewrite hundreds of utilities, we remap Tailwind's
+   --color-white / --color-black to semantic "ink" (text) and "surface" (base)
+   variables and flip them per theme. Every existing white/black utility then
+   adapts automatically. Accent + status colors stay semantic. */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  /* the flip: "white" = ink, "black" = surface */
+  --color-white: var(--ink);
+  --color-black: var(--surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/* Dark theme (default — also applied when no theme class is set). */
+:root,
+html.dark {
+  --background: #0a0b10;
+  --foreground: #e9e9f1;
+  --ink: #ecedf3;       /* soft white, not harsh #fff */
+  --surface: #0b0c12;   /* soft near-black, not harsh #000 */
+  --accent: #5b8cff;    /* soft blue */
+  --accent-soft: #93b4ff;
+  --glow-a: rgba(91, 140, 255, 0.14);
+  --glow-b: rgba(70, 110, 230, 0.07);
+  color-scheme: dark;
+}
+
+/* Light theme — soft, low-contrast surfaces; charcoal ink for easy reading. */
+html.light {
+  --background: #f5f6fa;
+  --foreground: #23262e;
+  --ink: #2a2e38;       /* soft charcoal, not harsh #000 */
+  --surface: #ffffff;   /* clean card/base surface */
+  --accent: #3f72ef;
+  --accent-soft: #2f5fd6;
+  --glow-a: rgba(91, 140, 255, 0.16);
+  --glow-b: rgba(120, 150, 240, 0.08);
+  color-scheme: light;
+}
+
+/* Solid accent buttons must keep white text in light mode (the white→ink flip
+   would otherwise turn their label charcoal on a blue fill). Targets only full
+   `.bg-accent` fills — accent/NN chips (which use accent-soft text) are exempt. */
+html.light .bg-accent {
+  color: #fff;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Subtle ambient glow so the near-black isn't flat. */
+  /* Soft ambient glow so the flat fields breathe — tuned per theme. */
   background-image:
-    radial-gradient(60rem 40rem at 50% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
-    radial-gradient(40rem 30rem at 100% 0%, rgba(37, 99, 235, 0.06), transparent 55%);
+    radial-gradient(60rem 40rem at 50% -10%, var(--glow-a), transparent 60%),
+    radial-gradient(40rem 30rem at 100% 0%, var(--glow-b), transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Thin, quiet scrollbars to match the dark theme. */
+/* Thin, quiet scrollbars that follow the theme ink. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: color-mix(in oklab, var(--ink) 18%, transparent) transparent;
+}
+
+/* ── Fluidity ───────────────────────────────────────────────────────────────
+   Gentle, consistent transitions so hovers + theme switches feel smooth. */
+a,
+button,
+input,
+textarea,
+select,
+[class*="bg-"],
+[class*="border-"],
+[class*="text-"] {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.25s ease,
+    box-shadow 0.3s ease,
+    transform 0.2s ease,
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+@keyframes tc-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes tc-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes tc-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes tc-pulse-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
+
+.tc-float { animation: tc-float 6s ease-in-out infinite; }
+.tc-fade-up { animation: tc-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tc-caret { animation: tc-blink 1s step-end infinite; }
+.tc-glow { animation: tc-pulse-glow 5s ease-in-out infinite; }
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .tc-float, .tc-fade-up, .tc-caret, .tc-glow { animation: none; }
+  a, button, input, textarea, select,
+  [class*="bg-"], [class*="border-"], [class*="text-"] { transition: none; }
 }
