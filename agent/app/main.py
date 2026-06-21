@@ -622,9 +622,14 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
     qs = f"?invite={invite_token}&join=1" + (f"&brand={slug}" if slug else "")
     join_link = f"{web}/sign-in{qs}"
 
-    # Live video call with the voice agent already in the room.
-    call = await start_agent_call(slug)
-    room_url = call.get("room_url", "") if call else ""
+    # Live video call with the voice agent already in the room. Best-effort: if
+    # this fails (Daily down, voice-control offline), the report still delivers
+    # the interview link below.
+    try:
+        call = await start_agent_call(slug)
+    except Exception:  # noqa: BLE001
+        call = {}
+    room_url = (call.get("room_url") or "") if isinstance(call, dict) else ""
 
     # Always deliver the links: DM first, and return them in the reply so the user
     # gets them even if DMs are closed.

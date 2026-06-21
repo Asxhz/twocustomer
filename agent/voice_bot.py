@@ -159,13 +159,19 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
 
     async def do_fix(params: Any) -> None:
         symptom = (params.arguments or {}).get("symptom", "the reported change")
-        await _chat(f"On it: {symptom}. Stepping off to build it, back in a moment.")
-        # Detach the build+rejoin so it outlives this pipeline, then leave the call.
-        fut = asyncio.ensure_future(_handoff(symptom))
+        await _chat(f"On it: {symptom}. Building the change and a live preview now, "
+                    "this takes about thirty seconds. I will come back with the links.")
+        # Detach the build+rejoin so it outlives this pipeline, bounded so it can
+        # never leak, then leave the call. Guard the callback so EndFrame always
+        # fires and the pipeline never wedges.
+        fut = asyncio.ensure_future(asyncio.wait_for(_handoff(symptom), timeout=300))
         _PENDING.add(fut)
         fut.add_done_callback(_PENDING.discard)
-        await params.result_callback({"status": "working",
-                                      "note": "stepping off the call to build; will rejoin"})
+        try:
+            await params.result_callback({"status": "working",
+                                          "note": "stepping off to build; will rejoin"})
+        except Exception:  # noqa: BLE001
+            pass
         await task.queue_frame(EndFrame())
 
     llm.register_function("fix_connected_repo", do_fix)

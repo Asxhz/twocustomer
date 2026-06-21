@@ -145,6 +145,18 @@ async def vercel_deploy(sandbox: Path) -> str | None:
             r = await c.post(f"https://api.vercel.com/v13/deployments{qs}", json=body,
                              headers={"Authorization": f"Bearer {token}"})
             if r.status_code not in (200, 201, 202):
+                import logging
+
+                code = ""
+                try:
+                    code = (r.json().get("error", {}) or {}).get("code", "")
+                except Exception:  # noqa: BLE001
+                    pass
+                logging.getLogger("twocustomer.fde").warning(
+                    "vercel deploy failed: HTTP %s %s", r.status_code, code)
+                # Signal a daily-quota hit distinctly so callers can explain it.
+                if r.status_code == 402 or "per-day" in code or "limited" in code:
+                    return "QUOTA"
                 return None
             dep = r.json()
             url = dep.get("url")

@@ -307,9 +307,9 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         )}
 
         {artifact?.kind === "packet" && (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.06] p-3">
-            <div className="mb-1 text-xs font-medium text-amber-200">📦 Packet</div>
-            <pre className="whitespace-pre-wrap text-xs text-amber-100/90">{artifact.text}</pre>
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-3">
+            <div className="mb-1 text-xs font-semibold text-amber-600">Packet</div>
+            <pre className="whitespace-pre-wrap text-xs text-foreground/80">{artifact.text}</pre>
           </div>
         )}
         {artifact?.kind === "image" && (
@@ -353,8 +353,8 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
             {(artifact.before || artifact.after) && (
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-lg border border-red-400/20 bg-red-400/[0.06] p-2">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-red-300/80">Before</div>
-                  <pre className="whitespace-pre-wrap text-red-100/80">{artifact.before}</pre>
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-red-600">Before</div>
+                  <pre className="whitespace-pre-wrap text-foreground/80">{artifact.before}</pre>
                 </div>
                 <div className="rounded-lg border border-accent/20 bg-accent/[0.06] p-2">
                   <div className="mb-1 text-[10px] uppercase tracking-wide text-accent-soft">After</div>
@@ -436,7 +436,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         <button
           onClick={send}
           disabled={busy}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black hover:bg-accent disabled:opacity-50"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
         >
           {busy ? "…" : "Send"}
         </button>
@@ -466,20 +466,26 @@ function JoinCallCard({
   const [room, setRoom] = useState<string | null>(null);
   const [roomUrl, setRoomUrl] = useState<string>("");
   const [links, setLinks] = useState<PreviewLink[]>([]);
+  const [err, setErr] = useState("");
 
   async function join() {
     setBusy(true);
+    setErr("");
     try {
       const r = await fetch("/api/call/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
       });
-      const d = await r.json();
-      if (d.room_url) {
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.room_url) {
         setRoomUrl(d.room_url);
         setRoom(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
+      } else {
+        setErr(d.error || "Could not start the call. Try again.");
       }
+    } catch {
+      setErr("Could not reach the call service. Try again.");
     } finally {
       setBusy(false);
     }
@@ -521,7 +527,9 @@ function JoinCallCard({
         >
           {busy ? "Starting call" : "Join video call"}
         </button>
-      ) : (
+      ) : null}
+      {err && <p className="mt-2 text-xs text-red-500">{err}</p>}
+      {room && (
         <>
           <iframe
             src={room}

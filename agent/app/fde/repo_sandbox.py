@@ -153,23 +153,36 @@ async def fix_connected_repo(
         # 4) Deploy a live preview of the patched tree, with one retry. Read from
         #    the working branch if we pushed; else apply edits to the default tree.
         preview_url = None
+        quota_hit = False
         if deploy:
             for _ in range(2):
                 preview_url = await _build_preview(
                     owner, repo, edits, ref=WORK_BRANCH if pushed else None)
+                if preview_url == "QUOTA":
+                    quota_hit = True
+                    preview_url = None
+                    break
                 if preview_url:
                     break
         if preview_url:
             _step(steps, "Deployed live preview", preview_url=preview_url)
             _step(steps, "Done — open the preview, then ask for the next change")
+        elif quota_hit:
+            _step(steps, "Preview paused: Vercel daily deploy limit reached (resets "
+                         "within 24h). PR and diff are ready.")
 
         if preview_url or pr_url:
+            note = None
+            if not preview_url and quota_hit:
+                note = ("Live preview is paused for today: the Vercel free plan allows "
+                        "100 deploys per day and that is used up (resets within 24h). The "
+                        "pull request and the diff are ready now.")
             return {
                 "repo": f"{owner}/{repo}", "file": primary["file"],
                 "files": changed,
                 "explanation": explanation,
                 "diff": diff[:6000], "pr_url": pr_url,
-                "preview_url": preview_url, "resolved": True,
+                "preview_url": preview_url, "preview_note": note, "resolved": True,
                 "branch": WORK_BRANCH, "iterable": True, "steps": steps,
             }
         # Edits computed but neither preview nor PR shipped (no token + deploy

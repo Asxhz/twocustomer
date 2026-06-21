@@ -7,11 +7,20 @@ tool's run() so the registry stays dependency-free and unit-testable.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
+import logging
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 ToolFn = Callable[..., Awaitable[Any]]
+
+logger = logging.getLogger("twocustomer.tools")
+
+# A single tool call may not block the agent turn forever (a dead upstream, a
+# slow deploy). FDE tools that build + deploy need a generous ceiling.
+_TOOL_TIMEOUT_S = 240
+_MAX_OUTPUT = 100_000
 
 
 @dataclass
@@ -82,23 +91,36 @@ class ToolRegistry:
             tool = self.get(name)
         except KeyError as exc:
             return f"ERROR: {exc}"
+        # Validate required args up front so a missing field is a clear message
+        # the model can recover from, not a confusing TypeError.
+        required = (tool.input_schema or {}).get("required", []) or []
+        missing = [k for k in required if k not in (args or {})]
+        if missing:
+            return f"ERROR: {name} needs {', '.join(missing)}. Provide it and retry."
         try:
             # pass only ctx kwargs the tool actually accepts
             sig = inspect.signature(tool.run)
             accepted = {k: v for k, v in ctx.items() if k in sig.parameters}
-            result = await tool.run(**args, **accepted)
+            result = await asyncio.wait_for(
+                tool.run(**args, **accepted), timeout=_TOOL_TIMEOUT_S)
             return result if isinstance(result, str) else _to_str(result)
+        except asyncio.TimeoutError:
+            logger.warning("tool %s timed out after %ss", name, _TOOL_TIMEOUT_S)
+            return (f"ERROR running {name}: it took too long. Tell the user it is still "
+                    "working and to try again in a moment.")
         except Exception as exc:  # noqa: BLE001 - surface to model, never crash loop
-            return f"ERROR running {name}: {exc}"
+            logger.exception("tool %s failed", name)
+            return f"ERROR running {name}: {str(exc)[:200]}"
 
 
 def _to_str(value: Any) -> str:
     import json
 
     try:
-        return json.dumps(value, default=str)
-    except Exception:
-        return str(value)
+        out = json.dumps(value, default=str)
+    except Exception:  # noqa: BLE001
+        out = str(value)
+    return out if len(out) <= _MAX_OUTPUT else out[:_MAX_OUTPUT] + "...(truncated)"
 
 
 # Process-wide default registry.
