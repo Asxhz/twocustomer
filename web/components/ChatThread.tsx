@@ -9,7 +9,18 @@ interface ToolChip {
 }
 type Artifact =
   | { kind: "packet"; text: string }
-  | { kind: "image"; url: string };
+  | { kind: "image"; url: string }
+  | { kind: "call_invite"; reason: string }
+  | {
+      kind: "fix_result";
+      repo?: string;
+      file?: string;
+      explanation?: string;
+      diff?: string;
+      pr_url?: string;
+      preview_url?: string;
+      preview_note?: string;
+    };
 
 export default function ChatThread({ injected }: { injected?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -66,6 +77,10 @@ export default function ChatThread({ injected }: { injected?: string }) {
         } else if (event === "artifact") {
           if (parsed.kind === "image") {
             setArtifact({ kind: "image", url: parsed.url as string });
+          } else if (parsed.kind === "call_invite") {
+            setArtifact({ kind: "call_invite", reason: (parsed.reason as string) || "" });
+          } else if (parsed.kind === "fix_result") {
+            setArtifact({ kind: "fix_result", ...(parsed as object) });
           } else {
             setArtifact({ kind: "packet", text: parsed.text as string });
           }
@@ -108,7 +123,7 @@ export default function ChatThread({ injected }: { injected?: string }) {
             className={
               m.role === "user"
                 ? "max-w-[80%] self-end rounded-2xl bg-white/10 px-4 py-2 text-sm"
-                : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100"
+                : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl bg-accent/10 px-4 py-2 text-sm text-accent-soft"
             }
           >
             {m.content}
@@ -123,7 +138,7 @@ export default function ChatThread({ injected }: { injected?: string }) {
                 className={
                   "rounded-full border px-2 py-0.5 text-xs " +
                   (t.done
-                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                    ? "border-accent/30 bg-accent/10 text-accent-soft"
                     : "border-amber-400/30 bg-amber-400/10 text-amber-200")
                 }
               >
@@ -135,13 +150,13 @@ export default function ChatThread({ injected }: { injected?: string }) {
 
         {status && (
           <div className="flex items-center gap-2 text-xs text-white/45">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
             {status}
           </div>
         )}
 
         {streaming && (
-          <div className="max-w-[80%] self-start whitespace-pre-wrap rounded-2xl bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">
+          <div className="max-w-[80%] self-start whitespace-pre-wrap rounded-2xl bg-accent/10 px-4 py-2 text-sm text-accent-soft">
             {streaming}
             <span className="ml-0.5 animate-pulse">▋</span>
           </div>
@@ -160,6 +175,40 @@ export default function ChatThread({ injected }: { injected?: string }) {
             <img src={artifact.url} alt="generated" className="max-h-72 rounded-lg" />
           </div>
         )}
+        {artifact?.kind === "call_invite" && <JoinCallCard reason={artifact.reason} />}
+        {artifact?.kind === "fix_result" && (
+          <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
+            <div className="mb-1 text-xs font-medium text-accent-soft">🔧 Fix ready</div>
+            {artifact.explanation && (
+              <p className="text-sm text-white/80">{artifact.explanation}</p>
+            )}
+            {artifact.file && (
+              <p className="mt-1 text-xs text-white/50">{artifact.repo} · {artifact.file}</p>
+            )}
+            {artifact.diff && (
+              <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-white/10 bg-black/40 p-2 text-xs text-white/70">
+                {artifact.diff}
+              </pre>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {artifact.preview_url && (
+                <a href={artifact.preview_url} target="_blank" rel="noopener"
+                   className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110">
+                  Open preview ↗
+                </a>
+              )}
+              {artifact.pr_url && (
+                <a href={artifact.pr_url} target="_blank" rel="noopener"
+                   className="rounded-lg border border-white/15 px-3 py-1.5 text-xs hover:border-accent/50">
+                  View PR ↗
+                </a>
+              )}
+            </div>
+            {!artifact.preview_url && artifact.preview_note && (
+              <p className="mt-2 text-xs text-white/40">{artifact.preview_note}</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -169,17 +218,59 @@ export default function ChatThread({ injected }: { injected?: string }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="Message TwoCustomer…"
-          className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-emerald-400/50"
+          className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-accent/50"
           disabled={busy}
         />
         <button
           onClick={send}
           disabled={busy}
-          className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:opacity-50"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black hover:bg-accent disabled:opacity-50"
         >
           {busy ? "…" : "Send"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function JoinCallCard({ reason }: { reason: string }) {
+  const [busy, setBusy] = useState(false);
+  const [room, setRoom] = useState<string | null>(null);
+
+  async function join() {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/session-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const d = await r.json();
+      if (d.room_url) {
+        setRoom(d.room_url);
+        window.open(d.room_url, "_blank", "noopener");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
+      <div className="mb-1 text-xs font-medium text-accent-soft">📞 Let&apos;s hop on a call</div>
+      <p className="text-sm text-white/80">
+        {reason || "Share your screen so I can see exactly what to change, then I'll build a fixed preview."}
+      </p>
+      <button
+        onClick={join}
+        disabled={busy}
+        className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
+      >
+        {busy ? "Creating room…" : room ? "Re-open call" : "Join video call"}
+      </button>
+      {room && (
+        <p className="mt-2 break-all text-xs text-white/40">{room}</p>
+      )}
     </div>
   );
 }

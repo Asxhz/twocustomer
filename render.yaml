@@ -60,3 +60,26 @@ services:
         sync: false
       - key: REDDIT_CLIENT_SECRET
         sync: false
+
+  # Fetch AI uAgent — discoverable on Agentverse/ASI:One, bridges to the control
+  # plane above. Long-lived worker (keeps a mailbox connection open).
+  - type: worker
+    name: twocustomer-uagent
+    runtime: python
+    rootDir: ./uagent
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run python agent.py
+    plan: starter
+    envVars:
+      - key: UAGENT_SEED
+        sync: false
+      - key: AGENTVERSE_API_KEY
+        sync: false
+      - key: ASI_ONE_API_KEY
+        sync: false
+      - key: AGENT_SHARED_TOKEN
+        sync: false
+      # Point the uAgent at the deployed control plane. Set to the agent
+      # service's full URL, e.g. https://twocustomer-agent.onrender.com
+      - key: AGENT_BASE_URL
+        sync: false

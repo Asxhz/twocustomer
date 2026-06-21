@@ -103,7 +103,12 @@ class RedisClient:
 
     async def get_json(self, key: str) -> Any | None:
         raw = await self.get(key)
-        return json.loads(raw) if raw else None
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):  # corrupt/non-JSON cache value
+            return None
 
     async def ping(self) -> bool:
         if not self._enabled:

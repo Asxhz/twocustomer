@@ -49,7 +49,7 @@ export const SESSIONS = [
     transcript: [
       { role: "agent", text: "Thanks for hopping on. What would make reordering easier for you?" },
       { role: "customer", text: "Honestly bigger case packs. 12s sell out before my next order lands." },
-      { role: "agent", text: "Got it — so a 24-pack SKU for wholesale. Anything on pricing?" },
+      { role: "agent", text: "Got it. so a 24-pack SKU for wholesale. Anything on pricing?" },
       { role: "customer", text: "If the per-unit drops a bit at 24, I'd switch everything over." },
     ],
   },
@@ -70,12 +70,12 @@ export const REWARDS = [
 ];
 
 export const INTEGRATIONS = [
-  { name: "Anthropic Claude", role: "Agent brain (claude-sonnet-4-6)", track: "Best Use of Anthropic" },
-  { name: "Browserbase", role: "Web monitoring (Stagehand/CDP)", track: "Best Use of Browserbase" },
-  { name: "Fetch AI · ASI:One", role: "Discoverable uAgent that takes action", track: "Best Use of Fetch AI" },
-  { name: "Deepgram", role: "Voice STT/TTS for customer interviews", track: "Best Use of Deepgram" },
-  { name: "Redis (Upstash)", role: "Agent memory + vector recall + cache", track: "Redis: Beyond Caching" },
-  { name: "Discord", role: "Customer-signal intake + alerts + /twocustomer command", track: "—" },
-  { name: "Slack", role: "Brand alert channel + slash commands", track: "—" },
-  { name: "Convex", role: "Realtime state + live monitor feed", track: "—" },
+  { name: "Anthropic Claude", role: "Agent brain (claude-sonnet-4-6)" },
+  { name: "Browserbase", role: "Web monitoring (hosted Chrome / CDP)" },
+  { name: "Fetch AI · ASI:One", role: "Discoverable uAgent that takes action" },
+  { name: "Deepgram", role: "Voice STT/TTS for customer interviews" },
+  { name: "Redis (Upstash)", role: "Agent memory + cache + sessions" },
+  { name: "Discord", role: "Customer-signal intake + alerts + slash commands" },
+  { name: "Slack", role: "Brand alert channel + slash commands" },
+  { name: "Convex", role: "Realtime state + live monitor feed" },
 ];

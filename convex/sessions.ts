@@ -33,3 +33,8 @@ export const list = query({
       .order("desc")
       .take(limit ?? 25),
 });
+
+export const get = query({
+  args: { id: v.id("sessions") },
+  handler: async (ctx, { id }) => ctx.db.get(id),
+});

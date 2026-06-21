@@ -14,7 +14,7 @@ export default async function Monitor() {
           <div>
             <h1 className="text-2xl font-semibold">Live monitor</h1>
             <p className="text-sm text-white/50">
-              Agents watching news · Reddit · web — scored for risk + opportunity.
+              Agents watching news · Reddit · web. scored for risk + opportunity.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -23,7 +23,7 @@ export default async function Monitor() {
               className={
                 "rounded-full px-2 py-0.5 text-xs " +
                 (live
-                  ? "bg-emerald-500/15 text-emerald-300"
+                  ? "bg-accent/15 text-accent-soft"
                   : "bg-white/10 text-white/50")
               }
             >

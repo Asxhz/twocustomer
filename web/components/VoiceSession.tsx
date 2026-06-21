@@ -12,7 +12,7 @@ export default function VoiceSession({ voice }: { voice: boolean }) {
         <div className="flex items-center gap-3">
           <VoiceButton onTranscript={setTranscript} />
           <span className="text-xs text-white/40">
-            {transcript ? "Transcript loaded — review and send" : "Tap to answer by voice"}
+            {transcript ? "Transcript loaded. review and send" : "Tap to answer by voice"}
           </span>
         </div>
       )}

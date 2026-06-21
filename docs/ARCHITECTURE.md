@@ -35,7 +35,7 @@
 | `convex/` | Realtime schema + functions (brands, mentions, insights, campaigns, packets, sessions, messages). |
 | `sandbox-site/` | A deliberately broken demo site (`hi hi my my`) the FDE loop fixes. |
 
-## Sponsor integrations
+## Integrations
 - **Anthropic** — `claude-sonnet-4-6` is the brain everywhere.
 - **Browserbase** — remote Chrome over CDP for web monitoring.
 - **Fetch AI / ASI:One** — discoverable, action-taking uAgent.

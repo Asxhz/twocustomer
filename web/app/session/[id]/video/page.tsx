@@ -24,7 +24,7 @@ export default function VideoSession() {
     <main className="flex min-h-screen flex-col">
       <header className="border-b border-white/10 px-6 py-3">
         <h1 className="text-sm font-semibold">
-          Live session — <span className="text-emerald-400">screen share enabled</span>
+          Live session. <span className="text-accent-soft">screen share enabled</span>
         </h1>
         <p className="text-xs text-white/50">
           Both join, the customer shares their screen, TwoCustomer interviews + watches.

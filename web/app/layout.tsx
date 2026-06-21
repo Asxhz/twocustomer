@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TwoCustomer — AI agent team for consumer brands",
+  title: "TwoCustomer. AI agent team for consumer brands",
   description:
     "Connect your data. TwoCustomer monitors signal 24/7, interviews your customers, and acts.",
 };
@@ -24,11 +24,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: browser extensions (Grammarly, etc.) inject
+    // attributes on <html>/<body> before React hydrates. Without this, the
+    // mismatch aborts hydration and the whole page becomes non-interactive
+    // (buttons/inputs dead. "doesn't talk or load").
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-black text-white">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-black text-white"
+      >
         {children}
       </body>
     </html>

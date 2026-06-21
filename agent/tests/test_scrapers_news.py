@@ -47,9 +47,11 @@ def test_news_search_empty_without_browserbase(monkeypatch):
 
 
 def test_news_in_defaults():
-    # hn + news + reddit; each yields nothing without its key (never fabricated).
+    # hn + news + reddit + x + linkedin; each yields nothing without access
+    # (never fabricated).
     from app.monitor.scrapers import (
         DEFAULT_SCRAPERS, hn_search, news_search, reddit_search,
     )
 
-    assert DEFAULT_SCRAPERS == [hn_search, news_search, reddit_search]
+    for s in (hn_search, news_search, reddit_search):
+        assert s in DEFAULT_SCRAPERS

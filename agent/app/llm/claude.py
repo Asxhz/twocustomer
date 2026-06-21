@@ -21,12 +21,13 @@ logger = logging.getLogger("twocustomer.claude")
 
 
 class ClaudeLLM(LLMClient):
-    def __init__(self, *, max_tokens: int = 4096) -> None:
+    def __init__(self, *, max_tokens: int = 4096, model: str | None = None) -> None:
         s = get_settings()
         if not s.anthropic_api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
         self._client = AsyncAnthropic(api_key=s.anthropic_api_key)
-        self._model = s.anthropic_model
+        # Per-task model routing; falls back to the configured default.
+        self._model = model or s.anthropic_model
         self._max_tokens = max_tokens
 
     def _kwargs(

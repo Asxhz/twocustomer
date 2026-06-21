@@ -15,7 +15,7 @@ export default async function Packets() {
           <span
             className={
               "rounded-full px-2 py-0.5 text-xs " +
-              (live ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-white/50")
+              (live ? "bg-accent/15 text-accent-soft" : "bg-white/10 text-white/50")
             }
           >
             {live ? "● live" : "○ demo"}
@@ -31,11 +31,11 @@ export default async function Packets() {
               <Link
                 key={i}
                 href={`/founder-packets/${id}`}
-                className="rounded-xl border border-white/10 bg-white/[0.02] p-4 hover:border-emerald-400/40"
+                className="rounded-xl border border-white/10 bg-white/[0.02] p-4 hover:border-accent/40"
               >
                 <h3 className="font-medium">{p.title}</h3>
                 <p className="mt-1 text-sm text-white/60">{p.summary}</p>
-                <span className="mt-2 inline-block text-xs text-emerald-400">Open packet →</span>
+                <span className="mt-2 inline-block text-xs text-accent-soft">Open packet →</span>
               </Link>
             );
           })}

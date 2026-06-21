@@ -27,16 +27,23 @@ class ConvexClient:
     async def _call(self, kind: str, path: str, args: dict[str, Any]) -> Any:
         if not self._enabled:
             return None
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post(
-                f"{self._url}/api/{kind}",
-                json={"path": path, "args": args, "format": "json"},
-            )
-            r.raise_for_status()
-            body = r.json()
+        try:
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.post(
+                    f"{self._url}/api/{kind}",
+                    json={"path": path, "args": args, "format": "json"},
+                )
+                r.raise_for_status()
+                try:
+                    body = r.json()
+                except ValueError:  # non-JSON (HTML error page, empty)
+                    return None
             if body.get("status") == "error":
-                raise RuntimeError(body.get("errorMessage", "convex error"))
+                # surface as None for queries/mutations rather than crashing callers
+                return None
             return body.get("value")
+        except Exception:  # noqa: BLE001 - network/timeout: degrade, never crash
+            return None
 
     async def mutation(self, path: str, **args: Any) -> Any:
         return await self._call("mutation", path, args)

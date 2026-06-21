@@ -51,6 +51,16 @@ class ToolRegistry:
     def names(self) -> list[str]:
         return sorted(self._tools)
 
+    def without(self, exclude: set[str]) -> "ToolRegistry":
+        """A view of this registry with some tools removed (role gating).
+
+        Shares the underlying Tool objects; only the visible set differs, so the
+        model is never offered (and can never dispatch) an excluded tool.
+        """
+        sub = ToolRegistry()
+        sub._tools = {n: t for n, t in self._tools.items() if n not in exclude}
+        return sub
+
     def specs(self) -> list[dict[str, Any]]:
         """Anthropic-format tool specs."""
         return [

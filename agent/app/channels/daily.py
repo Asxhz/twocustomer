@@ -43,12 +43,15 @@ async def create_room(*, name: str | None = None, ttl_seconds: int = 3600) -> di
     body: dict[str, Any] = {"properties": props}
     if name:
         body["name"] = name
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{_API}/rooms", headers=_headers(), json=body)
-        if r.status_code not in (200, 201):
-            return None
-        d = r.json()
-    return {"name": d.get("name"), "url": d.get("url")}
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{_API}/rooms", headers=_headers(), json=body)
+            if r.status_code not in (200, 201):
+                return None
+            d = r.json()
+        return {"name": d.get("name"), "url": d.get("url")}
+    except Exception:  # noqa: BLE001 - network/JSON failure: degrade, never crash
+        return None
 
 
 async def meeting_token(room_name: str, *, is_owner: bool = False,
@@ -56,9 +59,12 @@ async def meeting_token(room_name: str, *, is_owner: bool = False,
     """Mint a meeting token for a room (owner = agent/admin controls)."""
     if not is_configured():
         return None
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{_API}/meeting-tokens", headers=_headers(),
-                         json={"properties": {"room_name": room_name,
-                                              "is_owner": is_owner,
-                                              "user_name": user_name}})
-        return r.json().get("token") if r.status_code in (200, 201) else None
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{_API}/meeting-tokens", headers=_headers(),
+                             json={"properties": {"room_name": room_name,
+                                                  "is_owner": is_owner,
+                                                  "user_name": user_name}})
+            return r.json().get("token") if r.status_code in (200, 201) else None
+    except Exception:  # noqa: BLE001
+        return None

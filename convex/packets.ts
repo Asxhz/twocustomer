@@ -35,3 +35,8 @@ export const list = query({
       .order("desc")
       .take(limit ?? 25),
 });
+
+export const get = query({
+  args: { id: v.id("packets") },
+  handler: async (ctx, { id }) => ctx.db.get(id),
+});

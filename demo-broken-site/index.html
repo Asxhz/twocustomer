@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumina</title>
+    <style>
+      body { background:#0b0b0b; color:#fff; font-family:system-ui,sans-serif; display:grid; place-items:center; height:100vh; margin:0; }
+      h1 { font-size:3rem; letter-spacing:-0.02em; }
+    </style>
+  </head>
+  <body>
+    <h1 id="hero">…</h1>
+    <script src="./site.js"></script>
+    <script>
+      // mirrors site.js render() in the browser
+      document.getElementById("hero").textContent =
+        (typeof render === "function")
+          ? render("hi my name is lumina").split(" ").slice(0, 4).join(" ")
+          : "hi my name is";
+    </script>
+  </body>
+</html>

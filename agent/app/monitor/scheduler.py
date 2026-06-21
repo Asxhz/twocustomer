@@ -59,7 +59,8 @@ async def tick() -> int:
                 from app.channels.alerts import dispatch
 
                 await dispatch(f"[{m.platform}] {m.text[:200]}",
-                               title=f"High-signal mention · {slug}", severity="risk")
+                               title=f"High-signal mention · {slug}", severity="risk",
+                               brand_slug=slug)
 
             res = await run_monitor(
                 terms=cfg.get("terms", [slug]), scrapers=DEFAULT_SCRAPERS,
@@ -70,6 +71,10 @@ async def tick() -> int:
             if res.high_signal:
                 if await synth_insight(slug, res.high_signal):
                     produced += 1
+                    from app.channels.alerts import notify
+                    await notify("insight", f"New insight · {slug}",
+                                 body="The analyst formed a new insight from fresh signal.",
+                                 brand_slug=slug, href="/admin/insights")
         except Exception as exc:  # noqa: BLE001
             logger.warning("monitor tick failed for %s: %s", slug, exc)
         finally:

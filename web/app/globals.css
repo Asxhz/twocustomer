@@ -3,9 +3,9 @@
 :root {
   --background: #08080c;
   --foreground: #ededf2;
-  /* Brand accent (violet). Status colors (emerald/red/amber) stay semantic. */
-  --accent: #8b5cf6;
-  --accent-soft: #a78bfa;
+  /* Brand accent (blue). Status colors (red/amber) stay semantic. */
+  --accent: #3b82f6;
+  --accent-soft: #60a5fa;
 }
 
 @theme inline {
@@ -23,8 +23,8 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   /* Subtle ambient glow so the near-black isn't flat. */
   background-image:
-    radial-gradient(60rem 40rem at 50% -10%, rgba(139, 92, 246, 0.10), transparent 60%),
-    radial-gradient(40rem 30rem at 100% 0%, rgba(16, 185, 129, 0.05), transparent 55%);
+    radial-gradient(60rem 40rem at 50% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(40rem 30rem at 100% 0%, rgba(37, 99, 235, 0.06), transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }

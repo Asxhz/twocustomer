@@ -47,7 +47,7 @@ uv run --project agent python scripts/live_test.py   # show which integrations a
 - Rate limits + locks on every action; secrets only in gitignored `.env`.
 - Marketing/destructive actions return a **proposal the admin approves**.
 
-## Sponsor map
+## Integrations
 Anthropic (brain + FDE) · Browserbase (monitoring) · Fetch AI (ASI:One agent) ·
 Deepgram (voice) · Redis (memory) · Discord · Gemini (image edit) · Daily (video) ·
 Twilio (SMS/call) · Sentry (observability).

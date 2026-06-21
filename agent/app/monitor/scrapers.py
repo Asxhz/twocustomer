@@ -98,46 +98,15 @@ async def news_search(query: str, *, limit: int = 10) -> list[Mention]:
     return out
 
 
-# Sample Reddit posts used as a fallback when the OAuth API isn't configured,
-# so the Reddit source still contributes to the demo. {q} is the search term.
-_SAMPLE_REDDIT = [
-    ("just switched to {q} and my gut feels way better — the ginger one is elite", 240, 31),
-    ("PSA: saw a canned-beverage recall notice this week, double-check your cans", 512, 88),
-    ("is {q} actually worth the hype or is it just marketing? thinking of trying it", 96, 54),
-    ("restocked on {q} at Target, the yuzu flavor sells out instantly near me", 178, 22),
-    ("{q} sold out everywhere in my city for 3 weeks straight, fix the supply chain", 134, 47),
-    ("the new {q} can design is clean but the price went up again imo", 61, 19),
-]
-
-
-def _sample_reddit(query: str, limit: int) -> list[Mention]:
-    out: list[Mention] = []
-    for i, (tmpl, score, comments) in enumerate(_SAMPLE_REDDIT[:limit]):
-        text = tmpl.format(q=query)
-        out.append(
-            normalize(
-                "reddit",
-                external_id=f"sample-{i}-{abs(hash(query)) % 100000}",
-                text=text,
-                author=f"u/cpg_fan_{i}",
-                url="https://reddit.com/r/beverages",
-                ts=0,
-                engagement=float(score + comments),
-            )
-        )
-    return out
-
-
 async def reddit_search(query: str, *, limit: int = 10) -> list[Mention]:
-    """Search Reddit via its OAuth API (the only path that works — Reddit 403s
-    all unauthenticated access). When REDDIT_CLIENT_ID/SECRET are set this
-    returns live posts; otherwise it falls back to a small curated sample so the
-    Reddit source still shows up in the demo."""
+    """Search Reddit via its OAuth API (the only path that works; Reddit 403s all
+    unauthenticated access). Returns live posts when REDDIT_CLIENT_ID/SECRET are
+    set, else nothing. Never fabricated."""
     from app.state import reddit
 
     raw = await reddit.search(query, limit=limit)
     if not raw:
-        return _sample_reddit(query, limit)
+        return []
     out: list[Mention] = []
     for d in raw:
         out.append(
@@ -154,10 +123,63 @@ async def reddit_search(query: str, *, limit: int = 10) -> list[Mention]:
     return out
 
 
-# Default scrapers:
-#   hn_search     — keyless, always live (Algolia)
-#   news_search   — live via Browserbase (Google News RSS); [] without keys
-#   reddit_search — live via the Reddit OAuth API; [] without REDDIT_CLIENT_ID/
-#                   SECRET (Reddit 403s all unauthenticated access)
-# Nothing is ever fabricated — a source with no key simply yields nothing.
-DEFAULT_SCRAPERS = [hn_search, news_search, reddit_search]
+async def _bb_text(url: str) -> str:
+    """Fetch rendered page text through Browserbase. Empty string on any block."""
+    try:
+        from app.state.browserbase import fetch_text
+
+        return (await fetch_text(url, timeout_ms=30_000)) or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+async def x_search(query: str, *, limit: int = 10) -> list[Mention]:
+    """Real attempt at X/Twitter chatter via a public Nitter mirror over
+    Browserbase. X blocks unauthenticated search, so this returns nothing when
+    blocked. Never fabricated."""
+    from urllib.parse import quote
+
+    text = await _bb_text(f"https://nitter.net/search?q={quote(query)}&f=tweets")
+    if not text or "Tweet" not in text and "tweet" not in text:
+        return []
+    out: list[Mention] = []
+    for i, line in enumerate(t for t in text.splitlines() if query.lower() in t.lower()):
+        clean = line.strip()
+        if len(clean) < 20:
+            continue
+        out.append(normalize("x", external_id=f"x-{abs(hash(clean)) % 1000000}",
+                             text=clean[:300], author="x", url="https://x.com",
+                             ts=0, engagement=0.0))
+        if len(out) >= limit:
+            break
+    return out
+
+
+async def linkedin_search(query: str, *, limit: int = 10) -> list[Mention]:
+    """Real attempt at LinkedIn posts via Browserbase. LinkedIn requires login,
+    so this returns nothing when blocked. Never fabricated."""
+    from urllib.parse import quote
+
+    text = await _bb_text(f"https://www.linkedin.com/search/results/content/?keywords={quote(query)}")
+    if not text or "linkedin.com/authwall" in text.lower() or "sign in" in text.lower():
+        return []
+    out: list[Mention] = []
+    for line in (t for t in text.splitlines() if query.lower() in t.lower()):
+        clean = line.strip()
+        if len(clean) < 20:
+            continue
+        out.append(normalize("linkedin", external_id=f"li-{abs(hash(clean)) % 1000000}",
+                             text=clean[:300], author="linkedin",
+                             url="https://linkedin.com", ts=0, engagement=0.0))
+        if len(out) >= limit:
+            break
+    return out
+
+
+# Default scrapers. Each yields real signal or nothing; nothing is fabricated.
+#   hn_search       keyless, always live (Algolia)
+#   news_search     live via Browserbase (Google News RSS); [] without keys
+#   reddit_search   live via the Reddit OAuth API; [] without REDDIT_CLIENT_ID/SECRET
+#   x_search        real attempt via Browserbase/Nitter; [] when blocked
+#   linkedin_search real attempt via Browserbase; [] when blocked (login wall)
+DEFAULT_SCRAPERS = [hn_search, news_search, reddit_search, x_search, linkedin_search]

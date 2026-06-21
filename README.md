@@ -59,9 +59,9 @@ Open http://localhost:3000 — see `START.md` for the 90-second demo path.
   with Claude, and validates the fix (never touches prod).
 - **Edit** — generate / edit product imagery with Gemini and rewrite copy.
 
-## Sponsor tracks
+## Integrations
 
-| Track | Where |
+| Integration | Where |
 |---|---|
 | Anthropic | `claude-sonnet-4-6` agent brain (`agent/app/llm/claude.py`) |
 | Browserbase | remote-Chrome web monitoring (`agent/app/state/browserbase.py`) |

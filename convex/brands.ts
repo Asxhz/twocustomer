@@ -6,6 +6,7 @@ export const upsert = mutation({
   args: {
     name: v.string(),
     slug: v.string(),
+    companyId: v.optional(v.id("companies")),
     terms: v.array(v.string()),
     handles: v.optional(
       v.object({

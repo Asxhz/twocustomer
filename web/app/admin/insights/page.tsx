@@ -8,7 +8,7 @@ function Badge({ live }: { live: boolean }) {
     <span
       className={
         "rounded-full px-2 py-0.5 text-xs " +
-        (live ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-white/50")
+        (live ? "bg-accent/15 text-accent-soft" : "bg-white/10 text-white/50")
       }
     >
       {live ? "● live" : "○ demo"}
@@ -27,7 +27,7 @@ export default async function Insights() {
           <Badge live={live} />
         </header>
         <p className="mb-6 text-sm text-white/50">
-          Revenue opportunities, cost leaks, trends, and anomalies — found 24/7.
+          Revenue opportunities, cost leaks, trends, and anomalies. found 24/7.
         </p>
         <div className="flex flex-col gap-3">
           {rows.map((it, i) => (
@@ -37,7 +37,7 @@ export default async function Insights() {
                   className={
                     it.severity === "risk"
                       ? "rounded-full bg-red-500/15 px-2 py-0.5 text-xs text-red-300"
-                      : "rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300"
+                      : "rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent-soft"
                   }
                 >
                   {it.severity ?? "info"}

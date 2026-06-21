@@ -1,4 +1,4 @@
-// Shared UI primitives — cohesive dark design system (violet accent).
+// Shared UI primitives. cohesive dark design system (violet accent).
 import { type ReactNode } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -17,7 +17,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "good" | "bad" | "warn" | "accent" }) {
   const tones = {
     neutral: "bg-white/10 text-white/65",
-    good: "bg-emerald-500/15 text-emerald-300",
+    good: "bg-accent/15 text-accent-soft",
     bad: "bg-red-500/15 text-red-300",
     warn: "bg-amber-400/15 text-amber-200",
     accent: "bg-accent/15 text-accent-soft",

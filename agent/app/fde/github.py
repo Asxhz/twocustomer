@@ -13,6 +13,7 @@ extensions, never pushes to the default branch (PR only), temp sandbox cleaned u
 from __future__ import annotations
 
 import base64
+import contextvars
 import json
 import re
 from typing import Any
@@ -29,9 +30,16 @@ _MAX_BYTES = 400_000  # total source sent to the model
 _API = "https://api.github.com"
 
 
+# Per-request token override: the web forwards the company's connected OAuth
+# token so PRs are opened under their identity. Falls back to the env token.
+_token_override: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "gh_token_override", default=""
+)
+
+
 def _gh_headers() -> dict[str, str]:
     h = {"Accept": "application/vnd.github+json", "User-Agent": "twocustomer-fde"}
-    tok = get_settings().github_token
+    tok = _token_override.get() or get_settings().github_token
     if tok:
         h["Authorization"] = f"Bearer {tok}"
     return h
@@ -95,10 +103,14 @@ async def diagnose(files: dict[str, str], symptom: str, context: str = "") -> di
         raise RuntimeError("ANTHROPIC_API_KEY not set")
     from app.llm.claude import ClaudeLLM
 
+    from app.llm.router import model_for
+    from ._json import diagnose_json
+
     blob = "\n\n".join(f"=== {name} ===\n{content}" for name, content in files.items())
     ctx = f"\n\nADDITIONAL CONTEXT (from Discord / web monitoring):\n{context}" if context else ""
-    llm = ClaudeLLM(max_tokens=4000)
-    resp = await llm.complete(
+    llm = ClaudeLLM(max_tokens=4000, model=model_for("fde_diagnose"))
+    return await diagnose_json(
+        llm,
         system=("You are a forward-deployed engineer working on a real GitHub repo. "
                 "Given the source files, a reported symptom, and any extra context, "
                 "find the ONE file most responsible and return the corrected FULL "
@@ -107,10 +119,6 @@ async def diagnose(files: dict[str, str], symptom: str, context: str = "") -> di
                 '"patched": "<full corrected file content>"}'),
         messages=[{"role": "user", "content": f"SYMPTOM: {symptom}{ctx}\n\nFILES:\n{blob}"}],
     )
-    m = re.search(r"\{.*\}", resp.text, re.DOTALL)
-    if not m:
-        raise RuntimeError("diagnose: no JSON in model output")
-    return json.loads(m.group(0))
 
 
 def unified_diff(before: str, after: str, path: str) -> str:
@@ -157,12 +165,17 @@ async def open_pr(owner: str, repo: str, path: str, content: str,
 
 
 async def fix_github(repo_url: str, symptom: str, *, context: str = "",
-                     branch_suffix: str = "fde") -> dict[str, Any]:
-    """Full GitHub FDE loop. Returns the diagnosis, diff, and PR url (if any)."""
+                     branch_suffix: str = "fde", token: str = "") -> dict[str, Any]:
+    """Full GitHub FDE loop. Returns the diagnosis, diff, and PR url (if any).
+
+    `token` (the company's connected OAuth token, forwarded by the web) overrides
+    the env GITHUB_TOKEN for this request so the PR is opened under their account.
+    """
     parsed = parse_repo(repo_url)
     if not parsed:
         return {"error": "Not a valid public github.com repo URL."}
     owner, repo = parsed
+    reset = _token_override.set(token) if token else None
     try:
         files = await read_repo(owner, repo)
         if not files:
@@ -182,3 +195,6 @@ async def fix_github(repo_url: str, symptom: str, *, context: str = "",
         }
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
+    finally:
+        if reset is not None:
+            _token_override.reset(reset)

@@ -63,16 +63,60 @@ def command_text(payload: dict[str, Any]) -> str:
     return data.get("name", "")
 
 
+def command_name(payload: dict[str, Any]) -> str:
+    return str(payload.get("data", {}).get("name", ""))
+
+
+def command_option(payload: dict[str, Any], name: str) -> str:
+    for o in payload.get("data", {}).get("options", []):
+        if o.get("name") == name:
+            return str(o.get("value", ""))
+    return ""
+
+
+def invoking_user_id(payload: dict[str, Any]) -> str:
+    # In a guild: payload.member.user.id; in DM: payload.user.id
+    member = payload.get("member") or {}
+    user = member.get("user") or payload.get("user") or {}
+    return str(user.get("id", ""))
+
+
+async def dm(user_id: str, content: str) -> bool:
+    """Open a DM channel with a user and send a message. Needs DISCORD_BOT_TOKEN."""
+    s = get_settings()
+    if not (s.discord_bot_token and user_id):
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            ch = await c.post(
+                f"{_API}/users/@me/channels",
+                headers={"Authorization": f"Bot {s.discord_bot_token}"},
+                json={"recipient_id": user_id})
+            if ch.status_code not in (200, 201):
+                return False
+            cid = ch.json().get("id")
+            r = await c.post(
+                f"{_API}/channels/{cid}/messages",
+                headers={"Authorization": f"Bot {s.discord_bot_token}"},
+                json={"content": content[:1900]})
+            return r.status_code in (200, 201)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 async def followup(interaction_token: str, content: str) -> None:
     """Send the real reply after a deferred ack (3s rule)."""
     s = get_settings()
     if not s.discord_app_id:
         return
-    async with httpx.AsyncClient(timeout=20) as c:
-        await c.post(
-            f"{_API}/webhooks/{s.discord_app_id}/{interaction_token}",
-            json={"content": content[:1900]},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            await c.post(
+                f"{_API}/webhooks/{s.discord_app_id}/{interaction_token}",
+                json={"content": content[:1900]},
+            )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # ── Inbound: read team context from a channel ─────────────────────────────────
@@ -82,10 +126,13 @@ async def list_guilds() -> list[dict[str, Any]]:
     s = get_settings()
     if not s.discord_bot_token:
         return []
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(f"{_API}/users/@me/guilds",
-                        headers={"Authorization": f"Bot {s.discord_bot_token}"})
-        return r.json() if r.status_code == 200 else []
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{_API}/users/@me/guilds",
+                            headers={"Authorization": f"Bot {s.discord_bot_token}"})
+            return r.json() if r.status_code == 200 else []
+    except Exception:  # noqa: BLE001
+        return []
 
 
 async def read_context(channel_id: str | None = None, *, limit: int = 20) -> str:
@@ -125,6 +172,9 @@ async def alert(text: str, *, title: str = "High-signal mention",
     color = {"risk": 0xE74C3C, "opportunity": 0x2ECC71}.get(severity, 0x3498DB)
     embed = {"title": title, "description": text[:1900], "color": color,
              "footer": {"text": "TwoCustomer · live monitor"}}
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.post(s.discord_webhook_url, json={"embeds": [embed]})
-        return r.status_code in (200, 204)
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(s.discord_webhook_url, json={"embeds": [embed]})
+            return r.status_code in (200, 204)
+    except Exception:  # noqa: BLE001
+        return False

@@ -28,34 +28,37 @@ async def transcribe(audio: bytes, *, content_type: str = "audio/wav",
                      model: str = "nova-3") -> str:
     """Transcribe prerecorded audio. Returns the transcript text."""
     if not is_configured():
-        raise RuntimeError("DEEPGRAM_API_KEY not set")
+        return ""
     params = {"model": model, "smart_format": "true", "punctuate": "true"}
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.post(
-            _LISTEN, params=params,
-            headers={**_auth(), "Content-Type": content_type},
-            content=audio,
-        )
-        r.raise_for_status()
-        data: dict[str, Any] = r.json()
     try:
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(
+                _LISTEN, params=params,
+                headers={**_auth(), "Content-Type": content_type},
+                content=audio,
+            )
+            r.raise_for_status()
+            data: dict[str, Any] = r.json()
         return data["results"]["channels"][0]["alternatives"][0]["transcript"]
-    except (KeyError, IndexError):
+    except Exception:  # noqa: BLE001 - degrade to empty transcript, never crash
         return ""
 
 
 async def synthesize(text: str, *, model: str = "aura-2-thalia-en") -> bytes:
     """Text → speech audio bytes (mp3)."""
     if not is_configured():
-        raise RuntimeError("DEEPGRAM_API_KEY not set")
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.post(
-            _SPEAK, params={"model": model},
-            headers={**_auth(), "Content-Type": "application/json"},
-            json={"text": text},
-        )
-        r.raise_for_status()
-        return r.content
+        return b""
+    try:
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(
+                _SPEAK, params={"model": model},
+                headers={**_auth(), "Content-Type": "application/json"},
+                json={"text": text},
+            )
+            r.raise_for_status()
+            return r.content
+    except Exception:  # noqa: BLE001
+        return b""
 
 
 def stream_stt_url(*, model: str = "nova-3") -> str:

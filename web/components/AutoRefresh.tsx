@@ -19,9 +19,9 @@ export default function AutoRefresh({ seconds = 12 }: { seconds?: number }) {
     <button
       onClick={() => setOn((v) => !v)}
       className="inline-flex items-center gap-1.5 text-xs text-white/45 hover:text-white/70"
-      title={on ? "Live updates on — click to pause" : "Paused — click to resume"}
+      title={on ? "Live updates on. click to pause" : "Paused. click to resume"}
     >
-      <span className={"h-1.5 w-1.5 rounded-full " + (on ? "bg-emerald-400 animate-pulse" : "bg-white/30")} />
+      <span className={"h-1.5 w-1.5 rounded-full " + (on ? "bg-accent animate-pulse" : "bg-white/30")} />
       {on ? "Live" : "Paused"}
     </button>
   );

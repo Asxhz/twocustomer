@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
+import { getSession } from "@/lib/session";
 
 const CONVEX_URL = (process.env.CONVEX_URL || "").replace(/\/$/, "");
 
@@ -20,21 +21,24 @@ function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-// GET — the signed-in user's projects (+ seeded demos).
+// GET. the signed-in user's projects (+ seeded demos).
 export async function GET() {
-  const email = (await cookies()).get("tc_user")?.value ?? null;
+  const session = await getSession();
+  const email = session?.email ?? null;
   const selected = (await cookies()).get("tc_project")?.value ?? null;
   const rows = (await convex("query", "brands:listByOwner", { ownerEmail: email ?? undefined })) || [];
   return NextResponse.json({ projects: rows, selected });
 }
 
-// POST — create/connect a project, persist it, arm monitors, and select it.
+// POST. create/connect a project, persist it, arm monitors, and select it.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const name = (body.name ?? "").toString().trim();
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const slug = slugify(name);
-  const email = (await cookies()).get("tc_user")?.value ?? "";
+  const session = await getSession();
+  const email = session?.email ?? "";
+  const companyId = session?.companyId;
   const type = body.type === "software" ? "software" : "physical";
   const repoUrl = (body.repoUrl ?? "").toString().trim();
   const discordChannel = (body.discordChannel ?? "").toString().trim();
@@ -43,9 +47,10 @@ export async function POST(req: Request) {
     : (body.terms ?? "").toString().split(",").map((t: string) => t.trim()).filter(Boolean);
   if (!terms.length) terms.push(name);
 
-  // 1) persist the project in Convex
+  // 1) persist the project in Convex (linked to the admin's company)
   await convex("mutation", "brands:upsert", {
     name, slug, terms, type, repoUrl, discordChannel, ownerEmail: email,
+    ...(companyId ? { companyId } : {}),
   });
 
   // 2) arm the agent's monitor + store project metadata

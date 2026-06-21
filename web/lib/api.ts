@@ -3,7 +3,7 @@
 export const AGENT_BASE_URL =
   process.env.AGENT_BASE_URL || "http://localhost:8000";
 
-// Server-side headers for agent calls — attaches the shared bearer token when set.
+// Server-side headers for agent calls. attaches the shared bearer token when set.
 export function agentHeaders(
   extra: Record<string, string> = {},
 ): Record<string, string> {

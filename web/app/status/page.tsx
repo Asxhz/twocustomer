@@ -44,11 +44,11 @@ export default async function StatusPage() {
             className={
               "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs " +
               (up
-                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                ? "border-accent/30 bg-accent/10 text-accent-soft"
                 : "border-red-400/30 bg-red-400/10 text-red-300")
             }
           >
-            <span className={"h-1.5 w-1.5 rounded-full " + (up ? "bg-emerald-400 animate-pulse" : "bg-red-400")} />
+            <span className={"h-1.5 w-1.5 rounded-full " + (up ? "bg-accent animate-pulse" : "bg-red-400")} />
             {up ? "Agent online" : "Agent unreachable"}
           </span>
         </div>
@@ -71,10 +71,10 @@ export default async function StatusPage() {
                   <span
                     className={
                       "inline-flex items-center gap-1.5 text-xs " +
-                      (on ? "text-emerald-300" : "text-white/35")
+                      (on ? "text-accent-soft" : "text-white/35")
                     }
                   >
-                    <span className={"h-1.5 w-1.5 rounded-full " + (on ? "bg-emerald-400" : "bg-white/25")} />
+                    <span className={"h-1.5 w-1.5 rounded-full " + (on ? "bg-accent" : "bg-white/25")} />
                     {on ? "live" : "off"}
                   </span>
                 </div>

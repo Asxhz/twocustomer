@@ -82,9 +82,13 @@ async def diagnose(files: dict[str, str], symptom: str) -> dict[str, Any]:
         raise RuntimeError("ANTHROPIC_API_KEY not set")
     from app.llm.claude import ClaudeLLM
 
+    from app.llm.router import model_for
+    from ._json import diagnose_json
+
     blob = "\n\n".join(f"=== {name} ===\n{content}" for name, content in files.items())
-    llm = ClaudeLLM(max_tokens=2000)
-    resp = await llm.complete(
+    llm = ClaudeLLM(max_tokens=2000, model=model_for("fde_diagnose"))
+    return await diagnose_json(
+        llm,
         system=("You are a forward-deployed engineer. Given the site files and a "
                 "symptom, find the ONE file with the bug and return corrected FULL "
                 "file content. Respond ONLY with JSON: "
@@ -92,10 +96,6 @@ async def diagnose(files: dict[str, str], symptom: str) -> dict[str, Any]:
                 '"patched": "<full corrected file content>"}'),
         messages=[{"role": "user", "content": f"SYMPTOM: {symptom}\n\nFILES:\n{blob}"}],
     )
-    m = re.search(r"\{.*\}", resp.text, re.DOTALL)
-    if not m:
-        raise RuntimeError("diagnose: no JSON in model output")
-    return json.loads(m.group(0))
 
 
 async def vercel_deploy(sandbox: Path) -> str | None:

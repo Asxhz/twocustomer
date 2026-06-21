@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { AGENT_BASE_URL, agentHeaders } from "@/lib/api";
+import { getSession } from "@/lib/session";
 
 // Agent tool loops can run well past Vercel's default function limit.
 export const maxDuration = 300;
@@ -22,16 +23,24 @@ export async function POST(req: Request) {
   // Inject the selected project so the agent is project-aware.
   const slug = (await cookies()).get("tc_project")?.value;
   if (slug && !raw.brand_slug) raw.brand_slug = slug;
+  // Forward the caller's role so the agent can gate admin-only tools (FDE/PR).
+  const session = await getSession();
+  const role = session?.role ?? "customer";
+  raw.role = role;
   const body = JSON.stringify(raw);
   let upstream: Response;
   try {
     upstream = await fetch(`${AGENT_BASE_URL}/chat`, {
       method: "POST",
-      headers: agentHeaders({ "Content-Type": "application/json" }),
+      headers: agentHeaders({
+        "Content-Type": "application/json",
+        "x-tc-role": role,
+        ...(session?.companyId ? { "x-tc-company": session.companyId } : {}),
+      }),
       body,
     });
   } catch {
-    return sseError("Agent unreachable — is the control plane running on :8000?");
+    return sseError("Agent unreachable. is the control plane running on :8000?");
   }
 
   if (!upstream.ok || !upstream.body) {

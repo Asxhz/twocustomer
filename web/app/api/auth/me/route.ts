@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getSession } from "@/lib/session";
 
 export async function GET() {
-  const email = (await cookies()).get("tc_user")?.value ?? null;
-  return NextResponse.json({ email });
+  const s = await getSession();
+  if (!s) return NextResponse.json({ email: null, role: null, companyId: null });
+  return NextResponse.json({
+    email: s.email,
+    role: s.role,
+    companyId: s.companyId ?? null,
+  });
 }

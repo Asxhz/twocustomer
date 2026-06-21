@@ -34,7 +34,7 @@ export default function Studio() {
           <Badge tone="good">Gemini</Badge>
         </header>
         <p className="mb-6 text-sm text-white/55">
-          Generate or edit product imagery from a prompt — e.g. <em>&quot;make it cleaner, less hefty, better lighting.&quot;</em>
+          Generate or edit product imagery from a prompt. e.g. <em>&quot;make it cleaner, less hefty, better lighting.&quot;</em>
           {" "}Paste an image URL to edit an existing photo.
         </p>
 
@@ -44,7 +44,7 @@ export default function Studio() {
               <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)}
                 rows={4} className={inputCls} />
             </Field>
-            <Field label="Source image URL (optional — to edit)">
+            <Field label="Source image URL (optional. to edit)">
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://…/product.png" className={inputCls} />
             </Field>

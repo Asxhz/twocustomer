@@ -1,7 +1,7 @@
 # Fetch AI · ASI:One — TwoCustomer uAgent
 
-**Track:** Best Use of Fetch AI. **Goal:** an agent discoverable through ASI:One
-that understands intent and takes real action — not a chatbot or API wrapper.
+**Goal:** an agent discoverable through ASI:One that understands intent and takes
+real action — not a chatbot or API wrapper.
 
 ## What it does
 `uagent/agent.py` is a Fetch AI **uAgent** speaking the **Chat Protocol**
@@ -30,12 +30,19 @@ uv run python agent.py        # prints the agent address, starts mailbox
 ```
 Then register the printed address on Agentverse and connect it to ASI:One.
 
+## Deploy (always-on)
+The uAgent runs as the **twocustomer-uagent** worker in `render.yaml` (Render
+Blueprint). It needs `UAGENT_SEED` (stable address), `AGENTVERSE_API_KEY`,
+`ASI_ONE_API_KEY`, `AGENT_SHARED_TOKEN`, and `AGENT_BASE_URL` = the deployed
+agent service URL. On boot it publishes its manifest to Agentverse and keeps a
+mailbox connection open so ASI:One can reach it.
+
 ## Status
-- ✅ Chat-protocol agent + intent parser (6/6 unit tests pass offline).
+- ✅ Chat-protocol agent + intent parser (unit tests pass offline).
 - ✅ Control-plane bridge (forwards intents → `/chat`, parses SSE reply).
-- `[~]` Live runtime + Agentverse registration + ASI:One discovery: needs
-  `UAGENT_SEED`, `AGENTVERSE_API_KEY`, and a funded control plane (Anthropic
-  credits) to exercise end-to-end.
+- ✅ Deploy config: long-lived Render worker (`render.yaml`) with the keys above.
+- `[~]` First live Agentverse registration is exercised on first boot of the
+  worker (needs the keys set + a funded control plane).
 
 ## Demo script (Fetch track)
 1. Show the agent address + manifest published.

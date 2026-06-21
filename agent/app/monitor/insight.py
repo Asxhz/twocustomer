@@ -37,8 +37,9 @@ async def synth_insight(brand: str, mentions: list[Mention]) -> dict[str, Any] |
     if s.has_anthropic():
         try:
             from app.llm.claude import ClaudeLLM
+            from app.llm.router import model_for
 
-            llm = ClaudeLLM(max_tokens=300)
+            llm = ClaudeLLM(max_tokens=300, model=model_for("research_synth"))
             sample = "\n".join(f"- [{m.platform}] {m.text[:160]} ({m.author})"
                                for m in mentions[:6])
             resp = await llm.complete(
