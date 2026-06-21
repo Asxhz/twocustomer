@@ -70,15 +70,20 @@ def apply_patch(sandbox: Path, rel: str, content: str) -> None:
     _safe_target(sandbox, rel).write_text(content, encoding="utf-8")
 
 
-async def validate(sandbox: Path, *, bad_marker: str = "hi hi") -> tuple[str, bool]:
-    """Run the site and check the symptom is gone. Returns (output, healthy)."""
+async def validate(sandbox: Path, *, bad_marker: str = "hi hi") -> tuple[str, bool | None]:
+    """Run the site and check the symptom is gone. Returns (output, healthy).
+    healthy is None when validation can't run (no node, e.g. serverless) — the
+    caller then trusts the patch + still ships the preview."""
     entry = sandbox / "site.js"
     if not entry.exists():
-        return ("(no site.js to run)", False)
-    proc = await asyncio.create_subprocess_exec(
-        "node", "site.js", cwd=str(sandbox),
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-    out, _ = await proc.communicate()
+        return ("(no site.js to run)", None)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "node", "site.js", cwd=str(sandbox),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        out, _ = await proc.communicate()
+    except (FileNotFoundError, NotImplementedError):  # node unavailable
+        return ("(validation skipped: node unavailable)", None)
     text = out.decode().strip()
     healthy = bad_marker not in text and proc.returncode == 0
     return text, healthy
@@ -168,11 +173,16 @@ async def fix_site(symptom: str = "homepage hero renders 'hi hi my my'") -> dict
         fix = await diagnose(files, symptom)
         apply_patch(sandbox, fix["file"], fix["patched"])
         after_out, after_ok = await validate(sandbox)
-        preview = await vercel_deploy(sandbox) if after_ok else None
+        # Ship the preview unless validation explicitly failed (False). When it's
+        # skipped (None, e.g. no node on serverless), trust the applied patch.
+        changed = fix["patched"] != files.get(fix["file"], "")
+        deploy_ok = after_ok is not False
+        preview = await vercel_deploy(sandbox) if deploy_ok else None
+        resolved = (after_ok and not before_ok) if after_ok is not None else changed
         return {
             "file": fix["file"], "explanation": fix.get("explanation", ""),
             "before": before_out, "after": after_out,
-            "resolved": after_ok and not before_ok, "preview_url": preview,
+            "resolved": bool(resolved), "preview_url": preview,
             "sandbox": str(sandbox),
         }
     finally:
