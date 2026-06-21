@@ -15,6 +15,7 @@ type Artifact =
       kind: "fix_result";
       repo?: string;
       file?: string;
+      files?: string[];
       explanation?: string;
       diff?: string;
       pr_url?: string;
@@ -23,6 +24,9 @@ type Artifact =
       before?: string;
       after?: string;
       resolved?: boolean;
+      iterable?: boolean;
+      branch?: string;
+      steps?: { label: string; done?: boolean }[];
     };
 
 // Slash commands that open the live "get on a call → show me → I'll fix it" flow.
@@ -35,6 +39,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
   const [streaming, setStreaming] = useState("");
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [input, setInput] = useState("");
+  const [followup, setFollowup] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -72,10 +77,8 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
 
   // User confirmed they're sharing their screen → acknowledge, then run the real
   // FDE fix and deploy a private preview (no PR is pushed).
-  async function onScreenShared(issue: string) {
-    if (busy) return;
-    setArtifact(null);
-    setBusy(true);
+  // First fix after the user shares their screen.
+  function onScreenShared(issue: string) {
     setMessages((m) => [
       ...m,
       {
@@ -85,32 +88,51 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
           "I'm building a fixed preview…",
       },
     ]);
-    setStatus("Building a fixed preview…");
+    return runFix(issue, false);
+  }
+
+  // Run the connected-repo FDE. iterate=true stacks the change on the prior one
+  // (same branch/PR) and redeploys an updated preview — the "keep editing" loop.
+  async function runFix(issue: string, iterate: boolean) {
+    if (busy || !issue.trim()) return;
+    setArtifact(null);
+    setBusy(true);
+    setStatus(iterate ? "Applying your change…" : "Building a fixed preview…");
     try {
       const r = await fetch("/api/fix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symptom: issue }),
+        body: JSON.stringify({ symptom: issue, iterate }),
       });
       const d = (await r.json()) as Record<string, unknown>;
       setArtifact({
         kind: "fix_result",
+        repo: d.repo as string,
         file: d.file as string,
+        files: d.files as string[],
         explanation: d.explanation as string,
+        diff: d.diff as string,
+        pr_url: d.pr_url as string,
         preview_url: d.preview_url as string,
         before: d.before as string,
         after: d.after as string,
         resolved: Boolean(d.resolved),
+        iterable: Boolean(d.iterable),
+        branch: d.branch as string,
+        steps: (d.steps as { label: string; done?: boolean }[]) || [],
       });
       setMessages((m) => [
         ...m,
         {
           role: "assistant",
           content: d.preview_url
-            ? "Done — I fixed it and deployed a private preview. Open it below to check; " +
-              "nothing was pushed to production."
+            ? (iterate
+                ? "Updated — I applied your change and redeployed the preview. Open it below; " +
+                  "want another tweak? Just tell me."
+                : "Done — I fixed it and deployed a live preview. Open it below to check, " +
+                  "then ask me for the next change and I'll keep editing.")
             : d.error
-              ? `I hit a snag building the preview: ${d.error}`
+              ? `I hit a snag: ${d.error}`
               : "I took a pass at it — here's what I found.",
         },
       ]);
@@ -294,12 +316,23 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         {artifact?.kind === "fix_result" && (
           <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
             <div className="mb-1 text-xs font-medium text-accent-soft">🔧 Fix ready</div>
+            {artifact.steps && artifact.steps.length > 0 && (
+              <ul className="mb-2 space-y-0.5 text-xs text-white/70">
+                {artifact.steps.map((s, i) => (
+                  <li key={i}>
+                    <span className="text-accent-soft">✓</span> {s.label}
+                  </li>
+                ))}
+              </ul>
+            )}
             {artifact.explanation && (
               <p className="text-sm text-white/80">{artifact.explanation}</p>
             )}
-            {artifact.file && (
+            {(artifact.files?.length || artifact.file) && (
               <p className="mt-1 text-xs text-white/50">
-                {[artifact.repo, artifact.file].filter(Boolean).join(" · ")}
+                {[artifact.repo, (artifact.files?.length ? artifact.files.join(", ") : artifact.file)]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             )}
             {(artifact.before || artifact.after) && (
@@ -335,6 +368,41 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
             </div>
             {!artifact.preview_url && artifact.preview_note && (
               <p className="mt-2 text-xs text-white/40">{artifact.preview_note}</p>
+            )}
+            {artifact.iterable && artifact.preview_url && (
+              <div className="mt-3 border-t border-white/10 pt-2">
+                <p className="mb-1.5 text-[11px] text-white/50">
+                  Keep editing — e.g. “make the accent color green” or “add a tweet from @karpathy”.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={followup}
+                    onChange={(e) => setFollowup(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && followup.trim() && !busy) {
+                        const v = followup.trim();
+                        setFollowup("");
+                        runFix(v, true);
+                      }
+                    }}
+                    placeholder="Ask for another change…"
+                    className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-xs outline-none focus:border-accent/50"
+                    disabled={busy}
+                  />
+                  <button
+                    onClick={() => {
+                      const v = followup.trim();
+                      if (!v || busy) return;
+                      setFollowup("");
+                      runFix(v, true);
+                    }}
+                    disabled={busy}
+                    className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50"
+                  >
+                    {busy ? "…" : "Apply"}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

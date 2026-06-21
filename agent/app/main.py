@@ -764,10 +764,11 @@ async def discord_context(channel_id: str | None = None, limit: int = 20) -> dic
 
 
 class GithubFixBody(BaseModel):
-    repo_url: str
+    repo_url: str = ""
     symptom: str
     context: str = ""
     github_token: str = ""  # company's connected OAuth token (web forwards it)
+    iterate: bool = False   # keep editing the same working branch + PR
 
 
 @app.post("/fde/github")
@@ -835,7 +836,7 @@ async def fde_repo_ep(req: GithubFixBody) -> dict[str, Any]:
     if not settings.has_anthropic():
         return {"error": "ANTHROPIC_API_KEY not set"}
     return await fix_connected_repo(req.repo_url, req.symptom, context=req.context,
-                                    token=req.github_token)
+                                    token=req.github_token, iterate=req.iterate)
 
 
 # ── Daily video + screen-share session ────────────────────────────────────────
