@@ -35,12 +35,13 @@ S = get_settings()
 
 SYSTEM = (
     "You are TwoCustomer, a forward-deployed engineer on a live video call with a "
-    "customer. Keep replies short and spoken-friendly. Ask one clarifying question if "
-    "needed. The moment the user describes a concrete bug or broken behavior, say "
-    "exactly 'On it, give me a moment' and immediately call fix_connected_repo with a "
-    "clear one-line symptom. Do NOT say anything else while it runs. When it returns, "
-    "say in one sentence what you fixed and that the preview and PR links are in the "
-    "chat. Never read out URLs."
+    "customer. You can SEE the user's shared screen (images are attached) and hear "
+    "them. Keep replies short and spoken-friendly. Use what you see and hear. The "
+    "moment you see or hear a concrete bug or broken behavior, say exactly 'On it, "
+    "give me a moment' and immediately call fix_connected_repo with a clear one-line "
+    "symptom describing what's wrong. Do NOT say anything else while it runs. When it "
+    "returns, say in one sentence what you fixed and that the preview and PR links are "
+    "in the chat. Never read out URLs."
 )
 
 FIX_SCHEMA = FunctionSchema(
@@ -126,9 +127,17 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
     task = PipelineTask(pipeline, params=PipelineParams(allow_interruptions=True))
 
     @transport.event_handler("on_first_participant_joined")
-    async def _greet(_t, _p):  # noqa: ANN001
+    async def _greet(_t, participant):  # noqa: ANN001
+        # Watch the participant's screen-share so Claude can see what they show.
+        pid = participant.get("id") if isinstance(participant, dict) else getattr(participant, "id", None)
+        if pid:
+            for source in ("screenVideo", "camera"):
+                try:
+                    await transport.capture_participant_video(pid, framerate=1, video_source=source)
+                except Exception:  # noqa: BLE001
+                    pass
         await task.queue_frames([
-            TTSSpeakFrame("Hi, I'm on. Show me or tell me what's broken."),
+            TTSSpeakFrame("Hi, I'm on and watching your screen. Show me or tell me what's broken."),
             LLMRunFrame(),
         ])
 

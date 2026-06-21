@@ -15,10 +15,14 @@ OPUS = os.environ.get("ANTHROPIC_MODEL_OPUS", "claude-opus-4-8")
 # Quality-sensitive tasks get Sonnet. Everything else (chat, classify, score,
 # monitor, routing, validate) stays on Haiku for speed + cost.
 _SONNET_TASKS = {
-    "fde_diagnose", "campaign", "copy", "interview_synth", "analyst", "fixer", "research_synth",
+    "campaign", "copy", "interview_synth", "analyst", "research_synth",
 }
-# Reserved for rare, genuinely complex multi-step planning.
-_OPUS_TASKS = {"planner"}
+# Opus for the hard build/fix/vision work — code edits + understanding a screen.
+# Override the whole tier with USE_OPUS_FOR_FDE=0 to drop FDE back to Sonnet.
+_OPUS_TASKS = {"planner", "fde_diagnose", "fixer", "vision", "screen_fix"}
+if os.environ.get("USE_OPUS_FOR_FDE", "1") != "1":
+    _OPUS_TASKS = {"planner"}
+    _SONNET_TASKS = _SONNET_TASKS | {"fde_diagnose", "fixer"}
 
 
 def model_for(task: str) -> str:
