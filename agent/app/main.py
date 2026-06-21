@@ -202,6 +202,7 @@ class MonitorConfigBody(BaseModel):
     interval_minutes: int = 30
     threshold: float = 0.7
     enabled: bool = True
+    auto_fix: bool = False
     project_type: str = "physical"
     repo_url: str = ""
     discord_channel: str = ""

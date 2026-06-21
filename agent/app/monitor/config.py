@@ -18,6 +18,10 @@ class MonitorConfig(BaseModel):
     interval_minutes: int = Field(default=30, ge=1, le=1440)
     threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     enabled: bool = True
+    # When True, a high-signal *risk* insight on a connected repo auto-triggers the
+    # FDE (PR + preview) and notifies the founder. Off by default so nothing ships
+    # itself unless the founder opts in.
+    auto_fix: bool = False
     # Project metadata so the agent is project-aware.
     project_type: str = "physical"  # "software" | "physical"
     repo_url: str = ""
