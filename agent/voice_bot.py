@@ -58,13 +58,21 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
         room_url, token, "TwoCustomer",
         DailyParams(
             audio_in_enabled=True,
+            audio_in_sample_rate=16000,
             audio_out_enabled=True,
+            # Match the TTS rate exactly, or the voice plays low/slow.
+            audio_out_sample_rate=24000,
+            video_in_enabled=True,  # receive the screen-share track
             vad_analyzer=SileroVADAnalyzer(),
         ),
     )
-    stt = DeepgramSTTService(api_key=S.deepgram_api_key)
-    tts = DeepgramTTSService(api_key=S.deepgram_api_key, voice="aura-2-thalia-en")
-    llm = AnthropicLLMService(api_key=S.anthropic_api_key, model=model_for("chat"))
+    stt = DeepgramSTTService(api_key=S.deepgram_api_key, sample_rate=16000)
+    tts = DeepgramTTSService(api_key=S.deepgram_api_key, voice="aura-2-thalia-en",
+                             sample_rate=24000)
+    # Sonnet on the call: far more reliable at deciding to call the fix tool.
+    from app.llm.router import SONNET
+
+    llm = AnthropicLLMService(api_key=S.anthropic_api_key, model=SONNET)
 
     async def _chat(text: str) -> None:
         try:
