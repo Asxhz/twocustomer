@@ -19,6 +19,13 @@ dependencies = [
     "playwright>=1.60.0",
     "defusedxml>=0.7.1",
     "cryptography>=49.0.0",
+]
+
+# Local-only processes (Discord gateway bot + Pipecat voice agent). NOT installed
+# on Vercel serverless (heavy native deps + not needed by the HTTP control plane).
+# Install locally with: uv sync --extra voice
+[project.optional-dependencies]
+voice = [
     "discord-py>=2.7.1",
     "pipecat-ai[anthropic,daily,deepgram,silero]>=1.4.0",
 ]
