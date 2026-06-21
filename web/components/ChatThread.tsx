@@ -22,7 +22,7 @@ type Artifact =
       preview_note?: string;
     };
 
-export default function ChatThread({ injected }: { injected?: string }) {
+export default function ChatThread({ injected, onAssistant }: { injected?: string; onAssistant?: (text: string) => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [tools, setTools] = useState<ToolChip[]>([]);
   const [status, setStatus] = useState("");
@@ -90,11 +90,10 @@ export default function ChatThread({ injected }: { injected?: string }) {
           setStreaming(acc);
         } else if (event === "message") {
           setStatus("");
-          setMessages((m) => [
-            ...m,
-            { role: "assistant", content: (parsed.text as string) || "" },
-          ]);
+          const reply = (parsed.text as string) || "";
+          setMessages((m) => [...m, { role: "assistant", content: reply }]);
           setStreaming("");
+          if (reply) onAssistant?.(reply);
         }
       });
     } catch {
