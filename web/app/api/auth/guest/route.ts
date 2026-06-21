@@ -6,9 +6,20 @@ interface BrandRow { companyId?: string }
 
 // Guest customer access (e.g. from a Discord invite link). No password: mints a
 // short-lived customer session scoped to a brand's company so /u works instantly.
+interface InviteRow { used?: boolean; brand?: string }
+
 export async function POST(req: Request) {
-  const { brand, email } = await req.json().catch(() => ({}));
-  const slug = (brand || "").toString().trim();
+  const { brand, email, invite } = await req.json().catch(() => ({}));
+  // Single-use invite: reject if already used, else mark it used now.
+  let slug = (brand || "").toString().trim();
+  if (invite) {
+    const inv = await convexQuery<InviteRow | null>("invites:get", { id: invite });
+    if (inv?.used) {
+      return NextResponse.json({ error: "This link was already used." }, { status: 410 });
+    }
+    if (inv?.brand && !slug) slug = inv.brand;
+    await convexMutation("invites:markUsed", { id: invite });
+  }
   let companyId: string | undefined;
   if (slug) {
     const b = await convexQuery<BrandRow | null>("brands:getBySlug", { slug });

@@ -23,7 +23,10 @@ from discord import app_commands
 from app.config import get_settings
 
 S = get_settings()
-AGENT = (os.environ.get("AGENT_BASE_URL") or S.agent_base_url or "http://localhost:8000").rstrip("/")
+# Default to the deployed agent (always up) so the bot is reliable; override with
+# AGENT_BASE_URL=http://localhost:8000 when running everything locally.
+_DEFAULT_AGENT = "https://twocustomer-agent-ashs-projects-548e0de1.vercel.app"
+AGENT = (os.environ.get("AGENT_BASE_URL") or _DEFAULT_AGENT).rstrip("/")
 GUILD_ID = os.environ.get("DISCORD_GUILD_ID") or S.discord_guild_id
 
 
@@ -33,15 +36,19 @@ def _headers() -> dict[str, str]:
 
 
 async def _post(path: str, body: dict) -> str:
-    try:
-        async with httpx.AsyncClient(timeout=300) as c:
-            r = await c.post(f"{AGENT}{path}", json=body,
-                             headers={**_headers(), "Content-Type": "application/json"})
-            if r.status_code != 200:
-                return f"Agent error ({r.status_code}). Try again."
-            return r.json().get("reply", "Done.")
-    except Exception as exc:  # noqa: BLE001
-        return f"Could not reach the agent: {exc}"
+    last = ""
+    for attempt in range(3):  # retry transient connection failures
+        try:
+            async with httpx.AsyncClient(timeout=300) as c:
+                r = await c.post(f"{AGENT}{path}", json=body,
+                                 headers={**_headers(), "Content-Type": "application/json"})
+                if r.status_code != 200:
+                    return f"Agent error ({r.status_code}). Try again in a moment."
+                return r.json().get("reply", "Done.")
+        except Exception as exc:  # noqa: BLE001
+            last = str(exc)
+            await asyncio.sleep(1.5 * (attempt + 1))
+    return f"Couldn't reach the agent right now ({last}). Please try again."
 
 
 intents = discord.Intents.default()
