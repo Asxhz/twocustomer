@@ -1,6 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "source": "/(.*)",
-  "destination": "/.next/server/app/index.html"
+  "framework": "nextjs"
 }
