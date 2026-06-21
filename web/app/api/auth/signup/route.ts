@@ -26,17 +26,24 @@ export async function POST(req: Request) {
   }
 
   const passwordHash = await hashPassword(password);
+  // Don't pass setupComplete: upsert only patches provided keys, so an existing
+  // (already set-up) company is never reset back to the wizard.
   const companyId = await convexMutation<string>("companies:upsert", {
     name: `${value.split("@")[0] || "My"} workspace`,
     ownerEmail: value,
-    setupComplete: false,
   });
   await convexMutation("users:upsert", {
     email: value, role: "admin", companyId: companyId ?? undefined, passwordHash,
   });
 
-  const token = await mintSession(value, "admin", companyId ?? undefined, false);
-  const res = NextResponse.json({ ok: true, role: "admin" });
+  // Carry the real setup state so already-set-up founders skip the wizard.
+  const co = companyId
+    ? await convexQueryStatus<{ setupComplete?: boolean }>("companies:get", { id: companyId })
+    : { ok: false, value: null };
+  const setup = Boolean(co.value?.setupComplete);
+
+  const token = await mintSession(value, "admin", companyId ?? undefined, setup);
+  const res = NextResponse.json({ ok: true, role: "admin", setup });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;
 }

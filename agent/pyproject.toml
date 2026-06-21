@@ -20,6 +20,7 @@ dependencies = [
     "defusedxml>=0.7.1",
     "cryptography>=49.0.0",
     "discord-py>=2.7.1",
+    "pipecat-ai[anthropic,daily,deepgram,silero]>=1.4.0",
 ]
 
 [dependency-groups]

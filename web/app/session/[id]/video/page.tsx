@@ -10,10 +10,10 @@ export default function VideoSession() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/session-video", { method: "POST" })
+    fetch("/api/call/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
       .then((r) => r.json())
       .then((d) => {
-        if (d.room_url) setRoomUrl(d.room_url);
+        if (d.room_url) setRoomUrl(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
         else setError(d.error || "Could not start video session");
       })
       .catch(() => setError("Agent unreachable"))

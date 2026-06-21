@@ -36,15 +36,14 @@ export default function VoiceSession({ voice }: { voice: boolean }) {
   async function startCall() {
     setCallBusy(true);
     try {
-      const r = await fetch("/api/session-video", {
+      const r = await fetch("/api/call/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "customer interview" }),
+        body: "{}",
       });
       const d = await r.json();
       if (d.room_url) {
-        setCallUrl(d.room_url);
-        window.open(d.room_url, "_blank", "noopener");
+        setCallUrl(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
       }
     } finally {
       setCallBusy(false);

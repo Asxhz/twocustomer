@@ -239,16 +239,13 @@ function JoinCallCard({ reason }: { reason: string }) {
   async function join() {
     setBusy(true);
     try {
-      const r = await fetch("/api/session-video", {
+      const r = await fetch("/api/call/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: "{}",
       });
       const d = await r.json();
-      if (d.room_url) {
-        setRoom(d.room_url);
-        window.open(d.room_url, "_blank", "noopener");
-      }
+      if (d.room_url) setRoom(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
     } finally {
       setBusy(false);
     }
@@ -258,17 +255,22 @@ function JoinCallCard({ reason }: { reason: string }) {
     <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
       <div className="mb-1 text-xs font-medium text-accent-soft">📞 Let&apos;s hop on a call</div>
       <p className="text-sm text-white/80">
-        {reason || "Share your screen so I can see exactly what to change, then I'll build a fixed preview."}
+        {reason || "Hop on, share your screen, and I'll talk you through the fix and build it live."}
       </p>
-      <button
-        onClick={join}
-        disabled={busy}
-        className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
-      >
-        {busy ? "Creating room…" : room ? "Re-open call" : "Join video call"}
-      </button>
-      {room && (
-        <p className="mt-2 break-all text-xs text-white/40">{room}</p>
+      {!room ? (
+        <button
+          onClick={join}
+          disabled={busy}
+          className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
+        >
+          {busy ? "Starting call…" : "Join video call"}
+        </button>
+      ) : (
+        <iframe
+          src={room}
+          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          className="mt-2 h-[55vh] w-full rounded-lg border border-white/10"
+        />
       )}
     </div>
   );

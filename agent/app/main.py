@@ -94,7 +94,7 @@ app.add_middleware(
 # are excluded. /health, /assets, /sentry-debug stay open.
 _PROTECTED = ("/chat", "/interview", "/session/video", "/fde/fix", "/fde/github",
               "/fde/repo", "/research", "/edit/image", "/monitor/config",
-              "/discord/setup", "/discord/report")
+              "/discord/setup", "/discord/report", "/call/start")
 
 
 @app.middleware("http")
@@ -620,14 +620,14 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
             invite_token = ""
     join_link = f"{web}/sign-in?invite={invite_token}" + (f"&brand={slug}" if slug else "")
 
-    # Live video call so the user can show the issue.
-    room = await daily.create_room()
-    room_url = room.get("url", "") if room else ""
+    # Live video call with the voice agent already in the room.
+    call = await start_agent_call(slug)
+    room_url = call.get("room_url", "") if call else ""
 
     if user_id:
         msg = ["Thanks for flagging it. Two ways to go deeper:"]
         if room_url:
-            msg.append(f"- Hop on a quick video call (show me): {room_url}")
+            msg.append(f"- Hop on a quick video call, I'll be there: {room_url}")
         msg.append(f"- Or open this link to add detail by text or voice: {join_link}")
         msg.append("I'm already working on a fix.")
         await discord.dm(user_id, "\n".join(msg))
@@ -839,6 +839,56 @@ async def session_video() -> dict[str, Any]:
     owner = await daily.meeting_token(room["name"], is_owner=True, user_name="TwoCustomer")
     return {"room_url": room["url"], "name": room["name"], "owner_token": owner,
             "screenshare": True}
+
+
+async def _voice_join(room_url: str, token: str, brand_slug: str, repo_url: str,
+                      github_token: str) -> bool:
+    """Best-effort: tell the local voice-control to send the agent into the room."""
+    url = os.environ.get("VOICE_CONTROL_URL", "http://localhost:8100").rstrip("/")
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(f"{url}/join", json={
+                "room_url": room_url, "token": token, "brand_slug": brand_slug,
+                "repo_url": repo_url, "github_token": github_token,
+            }, headers={"Authorization": f"Bearer {settings.shared_token}"})
+            return r.status_code == 200
+    except Exception:  # noqa: BLE001 - voice agent is optional; call still works
+        return False
+
+
+async def start_agent_call(brand_slug: str) -> dict[str, Any]:
+    """Create a Daily room, send the voice agent in (with the brand's repo + token),
+    and return the room + a human meeting token."""
+    from app.state.convex_client import get_convex
+    from app.state.crypto import decrypt_secret
+
+    repo_url, github_token = "", ""
+    cx = get_convex()
+    if cx.enabled and brand_slug:
+        brand = await cx.query("brands:getBySlug", slug=brand_slug)
+        if brand:
+            repo_url = brand.get("repoUrl", "") or ""
+            if brand.get("companyId"):
+                company = await cx.query("companies:get", id=brand["companyId"])
+                if company and company.get("githubTokenEnc"):
+                    github_token = decrypt_secret(company["githubTokenEnc"]) or ""
+
+    room = await daily.create_room()
+    if not room:
+        return {"error": "DAILY_API_KEY not set", "room_url": None}
+    bot_token = await daily.meeting_token(room["name"], is_owner=True, user_name="TwoCustomer")
+    human_token = await daily.meeting_token(room["name"], is_owner=False, user_name="You")
+    joined = await _voice_join(room["url"], bot_token or "", brand_slug, repo_url, github_token)
+    return {"room_url": room["url"], "token": human_token, "agent_joined": joined,
+            "repo": repo_url}
+
+
+@app.post("/call/start")
+async def call_start_ep(req: ResearchBody) -> dict[str, Any]:
+    """Start a live call: room + the voice agent joins. brand_slug picks the repo."""
+    return await start_agent_call(req.brand_slug)
 
 
 # ── Twilio channel (SMS + phone-call interviews) ──────────────────────────────
