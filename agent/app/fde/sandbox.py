@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -25,7 +26,9 @@ from app.config import get_settings
 
 # repo root = three levels up from this file (agent/app/fde/sandbox.py -> repo)
 _REPO = Path(__file__).resolve().parents[3]
-TARGET_SITE = _REPO / "sandbox-site"
+# The demo site the interactive FDE loop fixes. Override with FDE_DEMO_SITE
+# (a folder name under the repo root) to point the demo at a different site.
+TARGET_SITE = _REPO / os.environ.get("FDE_DEMO_SITE", "demo-broken-site")
 
 ALLOWED_EXT = {".js", ".ts", ".tsx", ".jsx", ".html", ".css", ".json", ".md"}
 BLOCKED = {".env", ".env.local"}

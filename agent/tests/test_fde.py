@@ -15,8 +15,9 @@ def test_tool_registered():
 
 def test_prepare_sandbox_isolated():
     sb = sandbox.prepare_sandbox()
-    assert sb.exists() and sb.name == "sandbox-site"
-    # it's a COPY in a temp dir, not the repo's sandbox-site
+    # name matches the configured demo site (FDE_DEMO_SITE), not a hardcoded one
+    assert sb.exists() and sb.name == sandbox.TARGET_SITE.name
+    # it's a COPY in a temp dir, not the repo's source site
     assert str(sb) != str(sandbox.TARGET_SITE)
     assert (sb / "site.js").exists()
 
