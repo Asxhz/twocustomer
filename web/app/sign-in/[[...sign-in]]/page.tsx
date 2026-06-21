@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const TAGLINES = [
-  "The AI agent team for consumer brands.",
-  "Monitors your signal 24/7 — then fixes what's broken.",
+  "Growth at the pace of your customers.",
+  "Less friction. More shipped.",
   "Your forward-deployed engineer. And your CMO.",
-  "Talks to your customers. Ships your fixes.",
+  "Monitors your signal 24/7 — then fixes what's broken.",
 ];
 
 // Types a phrase out, holds, backspaces, then moves to the next — forever.

@@ -36,18 +36,23 @@ S = get_settings()
 SYSTEM = (
     "You are TwoCustomer, a forward-deployed engineer on a live video call with a "
     "customer. You can SEE the user's shared screen (images are attached) and hear "
-    "them. Keep replies short and spoken-friendly. Use what you see and hear. The "
-    "moment you see or hear a concrete bug or broken behavior, say exactly 'On it, "
-    "give me a moment' and immediately call fix_connected_repo with a clear one-line "
-    "symptom describing what's wrong. Do NOT say anything else while it runs. When it "
-    "returns, say in one sentence what you fixed and that the preview and PR links are "
-    "in the chat. Never read out URLs."
+    "them. Keep replies short and spoken-friendly. Use what you see and hear. "
+    "The user can ask for ANY change — fix a bug, change colors or fonts, edit copy, "
+    "or tweak layout. The moment you understand a concrete change they want, say "
+    "exactly: 'On it — give me a moment, I'll stop listening and be right back.' "
+    "Then immediately call fix_connected_repo with a clear one-line description of the "
+    "change. Do NOT say anything else while it runs. When it returns, say 'Okay, I'm "
+    "back —' then in one sentence what you changed and that the live preview link is in "
+    "the chat. If they ask for another change, do it again. Never read out URLs."
 )
 
 FIX_SCHEMA = FunctionSchema(
     name="fix_connected_repo",
-    description="Fix a concrete bug in the connected repo. Builds a preview + opens a PR.",
-    properties={"symptom": {"type": "string", "description": "The concrete bug, in one line."}},
+    description=("Apply a change to the connected repo and ship a live preview — a bug "
+                 "fix, a color/font/style change, a copy edit, or a layout tweak. "
+                 "Builds a live preview and opens/updates a PR."),
+    properties={"symptom": {"type": "string",
+                            "description": "The concrete change to make, in one line."}},
     required=["symptom"],
 )
 
@@ -81,30 +86,41 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
         except Exception:  # noqa: BLE001
             pass
 
+    # Track whether we've already made a change on this call, so follow-up
+    # requests stack on the same working branch + preview (the "keep editing" loop).
+    state = {"iterated": False}
+
     async def do_fix(params: Any) -> None:
-        symptom = (params.arguments or {}).get("symptom", "the reported issue")
-        await _chat(f"🔧 On it. Building a fix for: {symptom}")
+        symptom = (params.arguments or {}).get("symptom", "the reported change")
+        await _chat(f"🔧 On it. Applying: {symptom}")
         from app.fde.repo_sandbox import fix_connected_repo
 
-        res = await fix_connected_repo(repo_url, symptom, token=github_token)
+        try:
+            res = await fix_connected_repo(repo_url, symptom, token=github_token,
+                                           iterate=state["iterated"])
+        except Exception as exc:  # noqa: BLE001 - never crash the call
+            await _chat(f"⚠ Hit a snag applying that ({exc}). Tell me again and I'll retry.")
+            await params.result_callback({"error": str(exc)})
+            return
         if res.get("error"):
-            await _chat(f"⚠ {res['error']} (connect GitHub in Settings to fix this repo)")
+            await _chat(f"⚠ {res['error']} (connect GitHub in Settings to edit this repo)")
             await params.result_callback({"error": res["error"]})
             return
-        # Post preview + PR into the call chat so the user can open them right there.
+        state["iterated"] = True
+        # Post the preview + PR into the call chat so the user can open them here.
         links = []
         if res.get("preview_url"):
-            links.append(f"✅ Preview (safe, prod untouched): {res['preview_url']}")
+            links.append(f"✅ Live preview (prod untouched): {res['preview_url']}")
         if res.get("pr_url"):
             links.append(f"🔀 PR: {res['pr_url']}")
         if not links:
-            links.append("Diff ready. add a GitHub token in Settings to open the PR + preview.")
+            links.append("Change ready. Add a GitHub token in Settings to open the preview.")
         await _chat("\n".join(links))
         await params.result_callback({
             "explanation": res.get("explanation") or "done",
             "preview_url": res.get("preview_url"),
             "pr_url": res.get("pr_url"),
-            "spoke_links": "I dropped the preview and PR in the chat",
+            "spoke_links": "I dropped the live preview link in the chat — open it to see the change",
         })
 
     llm.register_function("fix_connected_repo", do_fix)

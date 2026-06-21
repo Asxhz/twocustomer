@@ -166,33 +166,35 @@ async def open_pr(owner: str, repo: str, path: str, content: str,
                                explanation, branch)
 
 
-async def commit_and_pr(owner: str, repo: str, edits: list[dict[str, str]],
-                        explanation: str, branch: str) -> str | None:
-    """Commit one or more file edits to `branch` and open (or reuse) a PR.
-
-    Idempotent + iteration-friendly: the branch is created from the default
-    branch only if missing; pushing more commits to an existing branch updates
-    the open PR automatically, so repeated edits accumulate on ONE branch and
-    ONE PR rather than spawning a new branch each time. None without a token."""
+async def push_edits(owner: str, repo: str, edits: list[dict[str, str]],
+                     explanation: str, branch: str, reset: bool = False) -> bool:
+    """Commit one or more file edits onto `branch` (created off the default branch
+    if missing). Idempotent + iteration-friendly: repeated calls stack commits on
+    the same branch so edits accumulate. `reset=True` first points the branch back
+    at the default branch (a fresh edit session) so old edits don't pile up.
+    Returns True if everything committed. False without a token / on any API
+    failure (caller still builds an in-memory preview)."""
     s = get_settings()
     if not s.github_token or not edits:
-        return None
+        return False
     h = {"Authorization": f"Bearer {s.github_token}",
          "Accept": "application/vnd.github+json"}
     async with httpx.AsyncClient(timeout=30, headers=h) as c:
         meta = (await c.get(f"{_API}/repos/{owner}/{repo}")).json()
         base = meta.get("default_branch", "main")
-        # Create the working branch off base if it doesn't exist yet.
+        base_sha = (await c.get(
+            f"{_API}/repos/{owner}/{repo}/git/ref/heads/{base}")
+        ).json()["object"]["sha"]
         ref = await c.get(f"{_API}/repos/{owner}/{repo}/git/ref/heads/{branch}")
         if ref.status_code != 200:
-            base_sha = (await c.get(
-                f"{_API}/repos/{owner}/{repo}/git/ref/heads/{base}")
-            ).json()["object"]["sha"]
             mk = await c.post(f"{_API}/repos/{owner}/{repo}/git/refs",
                               json={"ref": f"refs/heads/{branch}", "sha": base_sha})
             if mk.status_code not in (200, 201):
-                return None
-        # Write each file on the branch (read current sha on the branch to update).
+                return False
+        elif reset:
+            # Fresh session: force the branch back to the default branch's tip.
+            await c.patch(f"{_API}/repos/{owner}/{repo}/git/refs/heads/{branch}",
+                          json={"sha": base_sha, "force": True})
         for e in edits:
             path, content = e["file"], e["patched"]
             cur = await c.get(f"{_API}/repos/{owner}/{repo}/contents/{path}",
@@ -205,8 +207,21 @@ async def commit_and_pr(owner: str, repo: str, edits: list[dict[str, str]],
                 body["sha"] = sha
             up = await c.put(f"{_API}/repos/{owner}/{repo}/contents/{path}", json=body)
             if up.status_code not in (200, 201):
-                return None
-        # Reuse an open PR for this branch if one exists; else open a new one.
+                return False
+    return True
+
+
+async def open_or_reuse_pr(owner: str, repo: str, branch: str,
+                           explanation: str) -> str | None:
+    """Open a PR for `branch` (or reuse the existing open one). None w/o a token."""
+    s = get_settings()
+    if not s.github_token:
+        return None
+    h = {"Authorization": f"Bearer {s.github_token}",
+         "Accept": "application/vnd.github+json"}
+    async with httpx.AsyncClient(timeout=30, headers=h) as c:
+        base = (await c.get(f"{_API}/repos/{owner}/{repo}")).json().get(
+            "default_branch", "main")
         existing = await c.get(f"{_API}/repos/{owner}/{repo}/pulls",
                                params={"head": f"{owner}:{branch}", "state": "open"})
         if existing.status_code == 200 and existing.json():
@@ -216,6 +231,16 @@ async def commit_and_pr(owner: str, repo: str, edits: list[dict[str, str]],
             "head": branch, "base": base,
             "body": f"Automated change by TwoCustomer FDE.\n\n{explanation}"})
         return pr.json().get("html_url") if pr.status_code in (200, 201) else None
+
+
+async def commit_and_pr(owner: str, repo: str, edits: list[dict[str, str]],
+                        explanation: str, branch: str, make_pr: bool = True) -> str | None:
+    """Push edits to `branch`; optionally open/reuse a PR. Returns the PR url (or
+    None when make_pr is False or there's no token)."""
+    pushed = await push_edits(owner, repo, edits, explanation, branch)
+    if not pushed or not make_pr:
+        return None
+    return await open_or_reuse_pr(owner, repo, branch, explanation)
 
 
 async def fix_github(repo_url: str, symptom: str, *, context: str = "",

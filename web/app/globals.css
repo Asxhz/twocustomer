@@ -19,30 +19,31 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark theme (default — also applied when no theme class is set). */
+/* Dark theme (default) — sandstone aesthetic: warm near-black surfaces, soft
+   off-white ink, a desert-sand accent. Generous, calm, enterprise-clean. */
 :root,
 html.dark {
-  --background: #0a0b10;
-  --foreground: #e9e9f1;
-  --ink: #ecedf3;       /* soft white, not harsh #fff */
-  --surface: #0b0c12;   /* soft near-black, not harsh #000 */
-  --accent: #5b8cff;    /* soft blue */
-  --accent-soft: #93b4ff;
-  --glow-a: rgba(91, 140, 255, 0.14);
-  --glow-b: rgba(70, 110, 230, 0.07);
+  --background: #0c0a09;   /* warm near-black */
+  --foreground: #f3eee6;
+  --ink: #f3eee6;          /* warm off-white, not harsh #fff */
+  --surface: #0c0a09;      /* warm near-black base */
+  --accent: #c9a06a;       /* desert sand / tan */
+  --accent-soft: #e3c694;  /* lighter sand for text + highlights */
+  --glow-a: rgba(201, 160, 106, 0.13);
+  --glow-b: rgba(180, 140, 90, 0.06);
   color-scheme: dark;
 }
 
-/* Light theme — soft, low-contrast surfaces; charcoal ink for easy reading. */
+/* Light theme — warm sand-paper surfaces; soft espresso ink for easy reading. */
 html.light {
-  --background: #f5f6fa;
-  --foreground: #23262e;
-  --ink: #2a2e38;       /* soft charcoal, not harsh #000 */
-  --surface: #ffffff;   /* clean card/base surface */
-  --accent: #3f72ef;
-  --accent-soft: #2f5fd6;
-  --glow-a: rgba(91, 140, 255, 0.16);
-  --glow-b: rgba(120, 150, 240, 0.08);
+  --background: #f6f1e9;
+  --foreground: #2b2520;
+  --ink: #2b2520;          /* warm espresso, not harsh #000 */
+  --surface: #fffdf9;      /* warm clean card/base surface */
+  --accent: #a9743a;       /* deeper sand for contrast on light */
+  --accent-soft: #8a5e2c;
+  --glow-a: rgba(201, 160, 106, 0.18);
+  --glow-b: rgba(170, 130, 80, 0.08);
   color-scheme: light;
 }
 

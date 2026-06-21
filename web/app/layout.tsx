@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
+// Inter — the clean modern grotesk used across the sandstone-style redesign.
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -13,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TwoCustomer. AI agent team for consumer brands",
+  title: "TwoCustomer — Legal-grade AI agents for consumer brands",
   description:
-    "Connect your data. TwoCustomer monitors signal 24/7, interviews your customers, and acts.",
+    "Connect your data. TwoCustomer monitors signal 24/7, interviews your customers, and ships fixes.",
 };
 
 export default function RootLayout({

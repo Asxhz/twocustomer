@@ -97,50 +97,86 @@ async def fix_connected_repo(
 
     reset = github._token_override.set(token) if token else None
     try:
+        # 1) Read the repo. Only a READ failure justifies the bundled-sandbox
+        #    fallback (the repo genuinely isn't reachable).
         read_ref = WORK_BRANCH if iterate else None
-        files = await github.read_repo(owner, repo, ref=read_ref)
+        try:
+            files = await github.read_repo(owner, repo, ref=read_ref)
+        except Exception as exc:  # noqa: BLE001
+            return await _sandbox_fallback(symptom, f"couldn't read repo: {exc}", steps)
         if not files:
-            raise RuntimeError("no readable files")
+            return await _sandbox_fallback(symptom, "no readable files in repo", steps)
         _step(steps, f"Read {len(files)} files from {owner}/{repo}"
                      + (f" (branch {WORK_BRANCH})" if iterate else ""))
 
-        fix = await github.diagnose(files, symptom, context)
-        edits = fix["edits"]
+        # 2) Diagnose the change, with retries — transient JSON/format hiccups
+        #    shouldn't surface as a failure or a misleading sandbox preview.
+        edits: list[dict[str, str]] = []
+        explanation = ""
+        for attempt in range(3):
+            try:
+                fix = await github.diagnose(files, symptom, context)
+                edits = fix.get("edits") or []
+                explanation = fix.get("explanation", "")
+                if edits:
+                    break
+            except Exception as exc:  # noqa: BLE001
+                if attempt == 2:
+                    return {"error": f"Couldn't work out that change ({exc}). "
+                                     "Rephrase it and I'll retry.", "steps": steps}
         if not edits:
-            raise RuntimeError("could not determine a change to make")
+            return {"error": "I read the repo but couldn't pin down that change. "
+                             "Try describing it a bit more concretely.", "steps": steps}
         changed = [e["file"] for e in edits]
         _step(steps, f"Diagnosed change · editing {', '.join(changed)}",
-              explanation=fix.get("explanation", ""))
+              explanation=explanation)
 
         primary = edits[0]
         before = files.get(primary["file"], "")
         diff = github.unified_diff(before, primary["patched"], primary["file"])
 
-        pr_url = await github.commit_and_pr(owner, repo, edits,
-                                            fix.get("explanation", ""), WORK_BRANCH)
-        if pr_url:
-            _step(steps, "Pushed to branch twocustomer-fde · PR updated", pr_url=pr_url)
+        # 3) Push to the working branch + open/reuse the PR (best-effort).
+        #    A fresh (non-iterate) request resets the branch to main first so old
+        #    edits don't pile up; iterate=True stacks onto the prior change.
+        pushed = await github.push_edits(owner, repo, edits, explanation,
+                                         WORK_BRANCH, reset=not iterate)
+        pr_url = await github.open_or_reuse_pr(owner, repo, WORK_BRANCH, explanation) \
+            if pushed else None
+        if pushed:
+            _step(steps, "Pushed to branch twocustomer-fde"
+                         + (" · PR updated" if pr_url else ""), pr_url=pr_url)
 
-        preview_url = await _build_preview(
-            owner, repo, edits, ref=WORK_BRANCH if pr_url else None) if deploy else None
+        # 4) Deploy a live preview of the patched tree, with one retry. Read from
+        #    the working branch if we pushed; else apply edits to the default tree.
+        preview_url = None
+        if deploy:
+            for _ in range(2):
+                preview_url = await _build_preview(
+                    owner, repo, edits, ref=WORK_BRANCH if pushed else None)
+                if preview_url:
+                    break
         if preview_url:
             _step(steps, "Deployed live preview", preview_url=preview_url)
+            _step(steps, "Done — open the preview, then ask for the next change")
 
         if preview_url or pr_url:
-            _step(steps, "Done — open the preview, then ask for the next change")
             return {
                 "repo": f"{owner}/{repo}", "file": primary["file"],
                 "files": changed,
-                "explanation": fix.get("explanation", ""),
+                "explanation": explanation,
                 "diff": diff[:6000], "pr_url": pr_url,
                 "preview_url": preview_url, "resolved": True,
                 "branch": WORK_BRANCH, "iterable": True, "steps": steps,
             }
-        # Read worked but we couldn't build/PR — fall through to the bundled
-        # sandbox so the user still gets a LIVE preview.
-        raise RuntimeError("no preview/PR from connected repo")
-    except Exception as exc:  # noqa: BLE001
-        return await _sandbox_fallback(symptom, str(exc), steps)
+        # Edits computed but neither preview nor PR shipped (no token + deploy
+        # failed): return the diff so nothing is lost.
+        return {
+            "repo": f"{owner}/{repo}", "file": primary["file"], "files": changed,
+            "explanation": explanation, "diff": diff[:6000],
+            "pr_url": None, "preview_url": None, "resolved": False,
+            "preview_note": "Computed the change but couldn't deploy a preview just "
+                            "now — try again in a moment.", "steps": steps,
+        }
     finally:
         if reset is not None:
             github._token_override.reset(reset)
