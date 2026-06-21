@@ -97,15 +97,19 @@ async def fix_connected_repo(
 
     reset = github._token_override.set(token) if token else None
     try:
-        # 1) Read the repo. Only a READ failure justifies the bundled-sandbox
-        #    fallback (the repo genuinely isn't reachable).
+        # 1) Read the connected repo. If we can't, return a clear error. We do NOT
+        #    fall back to a bundled site here: that would show the user a different
+        #    site than their own, which is confusing. Edit the real code or say why not.
         read_ref = WORK_BRANCH if iterate else None
         try:
             files = await github.read_repo(owner, repo, ref=read_ref)
         except Exception as exc:  # noqa: BLE001
-            return await _sandbox_fallback(symptom, f"couldn't read repo: {exc}", steps)
+            return {"error": f"Could not read {owner}/{repo} ({exc}). Connect a GitHub "
+                             "token with repo access in Settings, then try again.",
+                    "steps": steps}
         if not files:
-            return await _sandbox_fallback(symptom, "no readable files in repo", steps)
+            return {"error": f"No readable source files found in {owner}/{repo}.",
+                    "steps": steps}
         _step(steps, f"Read {len(files)} files from {owner}/{repo}"
                      + (f" (branch {WORK_BRANCH})" if iterate else ""))
 
