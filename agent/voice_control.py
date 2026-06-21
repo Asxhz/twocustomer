@@ -42,24 +42,43 @@ async def health() -> dict[str, Any]:
     return {"status": "ok", "active_calls": list(_SESSIONS.keys())}
 
 
+def _spawn(room_url: str, token: str, brand: str, repo: str, gh: str,
+           announce: str = "", preview_url: str = "", pr_url: str = "") -> None:
+    """Start (or restart) a voice session in a room. `announce` marks a rejoin
+    session that returns after building a change. A `rejoin` callback is wired in
+    so the agent can leave to build, then come back, repeatedly."""
+
+    async def _rejoin(announce_text: str, res: dict) -> None:
+        # Small gap so the previous session has fully left the room.
+        await asyncio.sleep(1.0)
+        _spawn(room_url, token, brand, repo, gh, announce=announce_text,
+               preview_url=res.get("preview_url") or "", pr_url=res.get("pr_url") or "")
+
+    async def _run() -> None:
+        try:
+            await run_bot(room_url, token, brand_slug=brand, repo_url=repo,
+                          github_token=gh, announce=announce, rejoin=_rejoin,
+                          preview_url=preview_url, pr_url=pr_url)
+        except Exception as exc:  # noqa: BLE001
+            from loguru import logger
+            logger.warning(f"voice session ended with error: {exc}")
+        finally:
+            # Only clear the slot if this task is still the current one (a rejoin
+            # may have replaced it).
+            if _SESSIONS.get(room_url) is cur:
+                _SESSIONS.pop(room_url, None)
+
+    cur = asyncio.create_task(_run())
+    _SESSIONS[room_url] = cur
+
+
 @app.post("/join")
 async def join(req: JoinBody, request: Request) -> Any:
     if not _authed(request):
         return Response(status_code=401)
     if req.room_url in _SESSIONS and not _SESSIONS[req.room_url].done():
         return {"ok": True, "note": "already joined"}
-
-    async def _run() -> None:
-        try:
-            await run_bot(req.room_url, req.token, brand_slug=req.brand_slug,
-                          repo_url=req.repo_url, github_token=req.github_token)
-        except Exception as exc:  # noqa: BLE001
-            from loguru import logger
-            logger.warning(f"voice session ended with error: {exc}")
-        finally:
-            _SESSIONS.pop(req.room_url, None)
-
-    _SESSIONS[req.room_url] = asyncio.create_task(_run())
+    _spawn(req.room_url, req.token, req.brand_slug, req.repo_url, req.github_token)
     return {"ok": True}
 
 

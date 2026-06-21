@@ -12,10 +12,10 @@ const LINKS = [
 // picker · auth. Deliberately uncluttered — login leads here, then Dashboard.
 export default function Nav() {
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-surface/80 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-surface/85 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-3.5">
-        <Link href="/admin" className="text-[15px] font-semibold tracking-tight">
-          Two<span className="text-accent-soft">Customer</span>
+        <Link href="/admin" className="text-[15px] font-semibold tracking-tight text-white">
+          TwoCustomer
         </Link>
         <div className="flex flex-1 items-center gap-6 text-sm text-white/55">
           {LINKS.map((l) => (

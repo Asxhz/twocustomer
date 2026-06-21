@@ -19,38 +19,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark theme (default) — sandstone aesthetic: warm near-black surfaces, soft
-   off-white ink, a desert-sand accent. Generous, calm, enterprise-clean. */
+/* Light theme (default) — clean, minimal SaaS: white surfaces, near-black ink,
+   one restrained indigo accent, quiet neutral borders. Stripe / Linear feel. */
 :root,
-html.dark {
-  --background: #0c0a09;   /* warm near-black */
-  --foreground: #f3eee6;
-  --ink: #f3eee6;          /* warm off-white, not harsh #fff */
-  --surface: #0c0a09;      /* warm near-black base */
-  --accent: #c9a06a;       /* desert sand / tan */
-  --accent-soft: #e3c694;  /* lighter sand for text + highlights */
-  --glow-a: rgba(201, 160, 106, 0.13);
-  --glow-b: rgba(180, 140, 90, 0.06);
-  color-scheme: dark;
-}
-
-/* Light theme — warm sand-paper surfaces; soft espresso ink for easy reading. */
 html.light {
-  --background: #f6f1e9;
-  --foreground: #2b2520;
-  --ink: #2b2520;          /* warm espresso, not harsh #000 */
-  --surface: #fffdf9;      /* warm clean card/base surface */
-  --accent: #a9743a;       /* deeper sand for contrast on light */
-  --accent-soft: #8a5e2c;
-  --glow-a: rgba(201, 160, 106, 0.18);
-  --glow-b: rgba(170, 130, 80, 0.08);
+  --background: #fbfbfc;   /* near-white page */
+  --foreground: #18181b;
+  --ink: #18181b;          /* near-black text */
+  --surface: #ffffff;      /* white cards + base */
+  --accent: #4f46e5;       /* indigo */
+  --accent-soft: #4338ca;  /* slightly deeper for links + emphasis */
   color-scheme: light;
 }
 
-/* Solid accent buttons must keep white text in light mode (the white→ink flip
-   would otherwise turn their label charcoal on a blue fill). Targets only full
-   `.bg-accent` fills — accent/NN chips (which use accent-soft text) are exempt. */
-html.light .bg-accent {
+/* Dark theme (optional) — true near-black, high-contrast, same single accent. */
+html.dark {
+  --background: #0a0a0b;
+  --foreground: #f4f4f5;
+  --ink: #f4f4f5;
+  --surface: #121214;
+  --accent: #6366f1;
+  --accent-soft: #a5b4fc;
+  color-scheme: dark;
+}
+
+/* Solid accent buttons keep white text regardless of theme (the white->ink flip
+   would otherwise turn the label dark on the accent fill). Targets full
+   `.bg-accent` fills only; accent/NN tint chips use accent-soft text and are exempt. */
+.bg-accent {
   color: #fff;
 }
 
@@ -58,12 +54,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Soft ambient glow so the flat fields breathe — tuned per theme. */
-  background-image:
-    radial-gradient(60rem 40rem at 50% -10%, var(--glow-a), transparent 60%),
-    radial-gradient(40rem 30rem at 100% 0%, var(--glow-b), transparent 55%);
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
 }
 
 /* Thin, quiet scrollbars that follow the theme ink. */
@@ -92,31 +85,15 @@ select,
     opacity 0.2s ease;
 }
 
-@keyframes tc-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
+/* One quiet entrance animation. No floating/glowing gimmicks. */
 @keyframes tc-fade-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes tc-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-@keyframes tc-pulse-glow {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.06); }
-}
+.tc-fade-up { animation: tc-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-.tc-float { animation: tc-float 6s ease-in-out infinite; }
-.tc-fade-up { animation: tc-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.tc-caret { animation: tc-blink 1s step-end infinite; }
-.tc-glow { animation: tc-pulse-glow 5s ease-in-out infinite; }
-
-/* Respect users who prefer less motion. */
 @media (prefers-reduced-motion: reduce) {
-  .tc-float, .tc-fade-up, .tc-caret, .tc-glow { animation: none; }
+  .tc-fade-up { animation: none; }
   a, button, input, textarea, select,
   [class*="bg-"], [class*="border-"], [class*="text-"] { transition: none; }
 }

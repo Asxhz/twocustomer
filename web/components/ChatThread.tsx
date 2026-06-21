@@ -29,8 +29,23 @@ type Artifact =
       steps?: { label: string; done?: boolean }[];
     };
 
-// Slash commands that open the live "get on a call → show me → I'll fix it" flow.
+// Slash commands that open the live "get on a call, show me, I fix it" flow.
 const REPORT_COMMANDS = ["/report", "/idea", "/recommend", "/rec"];
+
+// Human labels for the inline activity chips (never show raw tool names).
+const TOOL_LABEL: Record<string, string> = {
+  fix_connected_repo: "Editing your site",
+  fix_site: "Building a preview",
+  fix_github: "Reading the code",
+  research_product: "Checking live signal",
+  monitor_brand: "Scanning mentions",
+  edit_product_image: "Editing the image",
+  request_call: "Setting up a call",
+  create_campaign: "Drafting a campaign",
+  edit_copy: "Editing copy",
+  web_search: "Searching the web",
+};
+const toolLabel = (n: string) => TOOL_LABEL[n] || "Working";
 
 export default function ChatThread({ injected, onAssistant }: { injected?: string; onAssistant?: (text: string) => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -63,29 +78,28 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         role: "assistant",
         content:
           "Let's hop on a quick call so I can see it. Tap Join, share your screen, " +
-          "and show me what's not working — then I'll build you a fixed preview.",
+          "and show me what's not working. Then I'll build you a fixed preview.",
       },
     ]);
     setArtifact({
       kind: "call_invite",
       reason:
-        "Share your screen so I can see exactly what's off — then I'll build a fixed preview.",
+        "Share your screen so I can see exactly what's off, then I'll build a fixed preview.",
       report: true,
       issue,
     });
   }
 
-  // User confirmed they're sharing their screen → acknowledge, then run the real
-  // FDE fix and deploy a private preview (no PR is pushed).
-  // First fix after the user shares their screen.
+  // User confirmed they are sharing their screen. Acknowledge, then run the real
+  // FDE fix and deploy a preview.
   function onScreenShared(issue: string) {
     setMessages((m) => [
       ...m,
       {
         role: "assistant",
         content:
-          "Yes — I can see your screen share now. I can see the issue. Give me a moment, " +
-          "I'm building a fixed preview…",
+          "I can see your screen now and I can see the issue. Give me a moment, " +
+          "I'm building a fixed preview.",
       },
     ]);
     return runFix(issue, false);
@@ -97,7 +111,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
     if (busy || !issue.trim()) return;
     setArtifact(null);
     setBusy(true);
-    setStatus(iterate ? "Applying your change…" : "Building a fixed preview…");
+    setStatus(iterate ? "Applying your change" : "Building a preview");
     try {
       const r = await fetch("/api/fix", {
         method: "POST",
@@ -127,13 +141,11 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
           role: "assistant",
           content: d.preview_url
             ? (iterate
-                ? "Updated — I applied your change and redeployed the preview. Open it below; " +
-                  "want another tweak? Just tell me."
-                : "Done — I fixed it and deployed a live preview. Open it below to check, " +
-                  "then ask me for the next change and I'll keep editing.")
+                ? "Updated. I applied your change and redeployed the preview. Open it below, and tell me the next change."
+                : "Done. I made the change and deployed a live preview. Open it below, then tell me what to change next.")
             : d.error
-              ? `I hit a snag: ${d.error}`
-              : "I took a pass at it — here's what I found.",
+              ? `That did not go through: ${d.error}`
+              : "I took a pass at it. Here is what I found.",
         },
       ]);
     } catch {
@@ -160,7 +172,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
     setTools([]);
     setStreaming("");
     setArtifact(null);
-    setStatus("Thinking…");
+    setStatus("Working");
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     setMessages((m) => [...m, { role: "user", content: text }]);
 
@@ -176,19 +188,19 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         if (event === "error") {
           setStatus("");
         } else if (event === "status") {
-          setStatus((parsed.text as string) || "Working…");
+          setStatus((parsed.text as string) || "Working");
         } else if (event === "tool_start") {
           const name = parsed.name as string;
           const friendly: Record<string, string> = {
-            fix_connected_repo: "Building the fix in a sandbox…",
-            fix_site: "Building a live preview…",
-            fix_github: "Diagnosing the repo…",
-            research_product: "Searching live signal…",
-            monitor_brand: "Scanning mentions…",
-            edit_product_image: "Generating the image…",
-            request_call: "Setting up a call…",
+            fix_connected_repo: "Looking at your repo",
+            fix_site: "Building a preview",
+            fix_github: "Reading the code",
+            research_product: "Checking live signal",
+            monitor_brand: "Scanning mentions",
+            edit_product_image: "Generating the image",
+            request_call: "Setting up a call",
           };
-          setStatus(friendly[name] || `Running ${name}…`);
+          setStatus(friendly[name] || "Working");
           setTools((t) =>
             t.some((x) => x.name === name && !x.done)
               ? t
@@ -265,13 +277,16 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
               <span
                 key={i}
                 className={
-                  "rounded-full border px-2 py-0.5 text-xs " +
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs " +
                   (t.done
-                    ? "border-accent/30 bg-accent/10 text-accent-soft"
-                    : "border-amber-400/30 bg-amber-400/10 text-amber-200")
+                    ? "border-accent/25 bg-accent/10 text-accent"
+                    : "border-white/15 bg-white/[0.04] text-white/60")
                 }
               >
-                {t.done ? "✓" : "⏳"} {t.name}
+                <span className={t.done ? "text-accent" : "h-1.5 w-1.5 animate-pulse rounded-full bg-white/40"}>
+                  {t.done ? "✓" : ""}
+                </span>
+                {toolLabel(t.name)}
               </span>
             ))}
           </div>
@@ -315,7 +330,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         )}
         {artifact?.kind === "fix_result" && (
           <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
-            <div className="mb-1 text-xs font-medium text-accent-soft">🔧 Fix ready</div>
+            <div className="mb-1 text-xs font-semibold text-accent">Preview ready</div>
             {artifact.steps && artifact.steps.length > 0 && (
               <ul className="mb-2 space-y-0.5 text-xs text-white/70">
                 {artifact.steps.map((s, i) => (
@@ -372,7 +387,7 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
             {artifact.iterable && artifact.preview_url && (
               <div className="mt-3 border-t border-white/10 pt-2">
                 <p className="mb-1.5 text-[11px] text-white/50">
-                  Keep editing — e.g. “make the accent color green” or “add a tweet from @karpathy”.
+                  Keep editing. For example: “make the accent color green” or “change the font”.
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -430,6 +445,14 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
   );
 }
 
+interface PreviewLink {
+  preview_url?: string;
+  pr_url?: string;
+  explanation?: string;
+  files?: string[];
+  at?: number;
+}
+
 function JoinCallCard({
   reason,
   report,
@@ -441,6 +464,8 @@ function JoinCallCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [room, setRoom] = useState<string | null>(null);
+  const [roomUrl, setRoomUrl] = useState<string>("");
+  const [links, setLinks] = useState<PreviewLink[]>([]);
 
   async function join() {
     setBusy(true);
@@ -451,17 +476,42 @@ function JoinCallCard({
         body: "{}",
       });
       const d = await r.json();
-      if (d.room_url) setRoom(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
+      if (d.room_url) {
+        setRoomUrl(d.room_url);
+        setRoom(d.token ? `${d.room_url}?t=${d.token}` : d.room_url);
+      }
     } finally {
       setBusy(false);
     }
   }
 
+  // While on a call, poll for preview links the agent produces so they always
+  // show in this panel (not only in the Daily chat).
+  useEffect(() => {
+    if (!roomUrl) return;
+    let live = true;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/call/links?room=${encodeURIComponent(roomUrl)}`);
+        const d = await r.json();
+        if (live && Array.isArray(d.links)) setLinks(d.links);
+      } catch {
+        // ignore transient poll errors
+      }
+    };
+    tick();
+    const id = setInterval(tick, 4000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [roomUrl]);
+
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
-      <div className="mb-1 text-xs font-medium text-accent-soft">📞 Let&apos;s hop on a call</div>
-      <p className="text-sm text-white/80">
-        {reason || "Hop on, share your screen, and I'll talk you through the fix and build it live."}
+    <div className="rounded-xl border border-white/10 bg-surface p-3">
+      <div className="mb-1 text-xs font-semibold text-accent">Live call</div>
+      <p className="text-sm text-white/70">
+        {reason || "Hop on, share your screen, and I will talk through the change and build it live."}
       </p>
       {!room ? (
         <button
@@ -469,7 +519,7 @@ function JoinCallCard({
           disabled={busy}
           className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
         >
-          {busy ? "Starting call…" : "Join video call"}
+          {busy ? "Starting call" : "Join video call"}
         </button>
       ) : (
         <>
@@ -478,19 +528,45 @@ function JoinCallCard({
             allow="camera; microphone; fullscreen; display-capture; autoplay"
             className="mt-2 h-[55vh] w-full rounded-lg border border-white/10"
           />
-          {/* In the /report flow, once the user is on the call and sharing, this
-              hands control back so the agent can "see" the screen and build the fix. */}
           {report && onShared && (
             <button
               onClick={onShared}
-              className="mt-2 rounded-lg border border-accent/40 px-4 py-2 text-sm font-medium text-accent-soft hover:bg-accent/10"
+              className="mt-2 rounded-lg border border-accent/40 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10"
             >
-              ✓ I&apos;m sharing my screen — show me the fix
+              I am sharing my screen, show me the fix
             </button>
           )}
         </>
       )}
-      {room && <p className="mt-2 break-all text-xs text-white/40">{room}</p>}
+
+      {links.length > 0 && (
+        <div className="mt-3 border-t border-white/10 pt-2">
+          <div className="mb-1.5 text-xs font-semibold text-white/70">Previews</div>
+          <ul className="flex flex-col gap-2">
+            {links.map((l, i) => (
+              <li key={i} className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                {l.explanation && (
+                  <p className="mb-1 text-xs text-white/70">{l.explanation}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {l.preview_url && (
+                    <a href={l.preview_url} target="_blank" rel="noopener"
+                       className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:brightness-110">
+                      Open preview
+                    </a>
+                  )}
+                  {l.pr_url && (
+                    <a href={l.pr_url} target="_blank" rel="noopener"
+                       className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:text-white">
+                      View PR
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

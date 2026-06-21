@@ -57,9 +57,22 @@ FIX_SCHEMA = FunctionSchema(
 )
 
 
+# Detached handoff tasks (FDE build + rejoin) must outlive the pipeline that
+# spawned them, so we keep hard references here until they finish.
+_PENDING: set[asyncio.Task] = set()
+
+
 async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
-                  repo_url: str = "", github_token: str = "") -> None:
-    """Join the Daily room and run the voice + FDE agent until the room empties."""
+                  repo_url: str = "", github_token: str = "",
+                  announce: str = "", rejoin=None,
+                  preview_url: str = "", pr_url: str = "") -> None:
+    """Join the Daily room and run the voice + FDE agent until the room empties.
+
+    announce: if set, the agent speaks this on join instead of the generic greeting
+      (used by a rejoin session that returns after building a change).
+    rejoin: async callable(announce_text) that starts a fresh session in the same
+      room. The agent leaves while it builds, then calls this to come back.
+    """
     transport = DailyTransport(
         room_url, token, "TwoCustomer",
         DailyParams(
@@ -90,38 +103,49 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
     # requests stack on the same working branch + preview (the "keep editing" loop).
     state = {"iterated": False}
 
-    async def do_fix(params: Any) -> None:
-        symptom = (params.arguments or {}).get("symptom", "the reported change")
-        await _chat(f"🔧 On it. Applying: {symptom}")
+    async def _handoff(symptom: str) -> None:
+        """Runs detached after the agent leaves: build the change, record the link,
+        then rejoin the room and announce it. Survives the pipeline teardown."""
         from app.fde.repo_sandbox import fix_connected_repo
 
         try:
             res = await fix_connected_repo(repo_url, symptom, token=github_token,
                                            iterate=state["iterated"])
-        except Exception as exc:  # noqa: BLE001 - never crash the call
-            await _chat(f"⚠ Hit a snag applying that ({exc}). Tell me again and I'll retry.")
-            await params.result_callback({"error": str(exc)})
-            return
+        except Exception as exc:  # noqa: BLE001
+            res = {"error": str(exc)}
+        if not res.get("error"):
+            state["iterated"] = True
+            try:
+                from app.state.call_links import record_link
+
+                await record_link(room_url, res)
+            except Exception:  # noqa: BLE001
+                pass
+
         if res.get("error"):
-            await _chat(f"⚠ {res['error']} (connect GitHub in Settings to edit this repo)")
-            await params.result_callback({"error": res["error"]})
-            return
-        state["iterated"] = True
-        # Post the preview + PR into the call chat so the user can open them here.
-        links = []
-        if res.get("preview_url"):
-            links.append(f"✅ Live preview (prod untouched): {res['preview_url']}")
-        if res.get("pr_url"):
-            links.append(f"🔀 PR: {res['pr_url']}")
-        if not links:
-            links.append("Change ready. Add a GitHub token in Settings to open the preview.")
-        await _chat("\n".join(links))
-        await params.result_callback({
-            "explanation": res.get("explanation") or "done",
-            "preview_url": res.get("preview_url"),
-            "pr_url": res.get("pr_url"),
-            "spoke_links": "I dropped the live preview link in the chat — open it to see the change",
-        })
+            announce_text = (f"I am back. I could not make that change: {res['error']}. "
+                             "Tell me again and I will retry.")
+        else:
+            announce_text = ("I am back. " + (res.get("explanation") or "Done.")
+                             + " The live preview link is in the chat.")
+        # Rejoin the same room with the result. If rejoin is unavailable, the link
+        # is still recorded for the UI panel, so nothing is lost.
+        if rejoin is not None:
+            try:
+                await rejoin(announce_text, res)
+            except Exception:  # noqa: BLE001
+                pass
+
+    async def do_fix(params: Any) -> None:
+        symptom = (params.arguments or {}).get("symptom", "the reported change")
+        await _chat(f"On it: {symptom}. Stepping off to build it, back in a moment.")
+        # Detach the build+rejoin so it outlives this pipeline, then leave the call.
+        fut = asyncio.ensure_future(_handoff(symptom))
+        _PENDING.add(fut)
+        fut.add_done_callback(_PENDING.discard)
+        await params.result_callback({"status": "working",
+                                      "note": "stepping off the call to build; will rejoin"})
+        await task.queue_frame(EndFrame())
 
     llm.register_function("fix_connected_repo", do_fix)
 
@@ -152,10 +176,22 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
                     await transport.capture_participant_video(pid, framerate=1, video_source=source)
                 except Exception:  # noqa: BLE001
                     pass
-        await task.queue_frames([
-            TTSSpeakFrame("Hi, I'm on and watching your screen. Show me or tell me what's broken."),
-            LLMRunFrame(),
-        ])
+        if announce:
+            # Rejoin session: post the link, speak the result, then keep listening.
+            links = []
+            if preview_url:
+                links.append(f"Live preview: {preview_url}")
+            if pr_url:
+                links.append(f"PR: {pr_url}")
+            if links:
+                await _chat("\n".join(links))
+            await task.queue_frames([TTSSpeakFrame(announce), LLMRunFrame()])
+        else:
+            await task.queue_frames([
+                TTSSpeakFrame("Hi, I'm on and watching your screen. Tell me what you'd "
+                              "like changed, or show me what's off."),
+                LLMRunFrame(),
+            ])
 
     @transport.event_handler("on_participant_left")
     async def _maybe_end(_t, _p, _reason):  # noqa: ANN001

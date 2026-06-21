@@ -902,6 +902,14 @@ async def call_start_ep(req: ResearchBody) -> dict[str, Any]:
     return await start_agent_call(req.brand_slug)
 
 
+@app.get("/call/links")
+async def call_links_ep(room: str = "") -> dict[str, Any]:
+    """Preview/PR links the voice agent produced during a call (for the UI panel)."""
+    from app.state.call_links import get_links
+
+    return {"room": room, "links": await get_links(room)}
+
+
 # ── Twilio channel (SMS + phone-call interviews) ──────────────────────────────
 
 async def _interview_step(session_id: str, answer: str | None,

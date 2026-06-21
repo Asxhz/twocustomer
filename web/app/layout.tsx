@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TwoCustomer — Legal-grade AI agents for consumer brands",
+  title: "TwoCustomer. AI agents for consumer brands",
   description:
     "Connect your data. TwoCustomer monitors signal 24/7, interviews your customers, and ships fixes.",
 };
@@ -32,14 +32,14 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} light h-full antialiased`}
     >
       <head>
         {/* No-flash theme init: apply the saved theme before first paint.
-            Dark-first — only switch to light if the user previously chose it. */}
+            Light by default; only switch to dark if the user previously chose it. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('tc-theme');var d=document.documentElement;d.classList.remove('dark','light');d.classList.add(t==='light'?'light':'dark');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('tc-theme');var d=document.documentElement;d.classList.remove('dark','light');d.classList.add(t==='dark'?'dark':'light');}catch(e){}})();`,
           }}
         />
       </head>
