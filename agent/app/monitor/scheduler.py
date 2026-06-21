@@ -25,6 +25,59 @@ _STATES: dict[str, MonitorState] = {}
 REGISTERED: dict[str, dict] = {}
 
 
+async def _github_token_for_brand(slug: str) -> str:
+    """Resolve a brand's company GitHub token (decrypted) for autonomous fixes.
+    Returns '' when unavailable — the FDE then returns a diff without opening a PR."""
+    from app.state.convex_client import get_convex
+    from app.state.crypto import decrypt_secret
+
+    cx = get_convex()
+    if not cx.enabled:
+        return ""
+    try:
+        brand = await cx.query("brands:getBySlug", slug=slug)
+        owner = (brand or {}).get("ownerEmail")
+        if not owner:
+            return ""
+        company = await cx.query("companies:getByOwner", ownerEmail=owner)
+        return decrypt_secret((company or {}).get("githubTokenEnc", "") or "") or ""
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("token lookup failed for %s: %s", slug, exc)
+        return ""
+
+
+async def _auto_fix(slug: str, cfg: dict, insight: dict) -> None:
+    """Autonomous CMO→FDE: a connected repo + a risk insight → open a fix (PR +
+    preview) and notify the founder. No-ops safely without a connected repo, and a
+    per-brand cooldown lock keeps it from shipping on every tick."""
+    repo_url = cfg.get("repo_url")
+    if not repo_url:
+        return
+    from app.state.limits import acquire_lock
+
+    # Acquire-and-hold (never released): the lock expires after the cooldown so we
+    # ship at most one auto-fix per brand per window, not one per monitor tick.
+    if not await acquire_lock(f"autofix:{slug}", ttl_s=6 * 3600):
+        return
+    token = await _github_token_for_brand(slug)
+    from app.channels.alerts import notify
+    from app.fde.repo_sandbox import fix_connected_repo
+
+    symptom = f"{insight['title']} — {insight['body']}"
+    try:
+        res = await fix_connected_repo(repo_url, symptom, token=token)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("auto-fix failed for %s: %s", slug, exc)
+        return
+    if res.get("error"):
+        logger.info("auto-fix skipped for %s: %s", slug, res["error"])
+        return
+    href = res.get("pr_url") or res.get("preview_url") or "/admin"
+    await notify("fix", f"Auto-fix shipped · {slug}",
+                 body=f"{insight['title']} → {res.get('file', 'patched')}",
+                 brand_slug=slug, href=href)
+
+
 async def persist_mentions(slug: str, mentions: list[Mention]) -> int:
     """Write scored mentions to Convex (idempotent on (brand, externalId)).
     No-op when Convex is unconfigured. Returns # newly inserted."""
@@ -69,12 +122,16 @@ async def tick() -> int:
             )
             await persist_mentions(slug, res.fresh)  # durable feed + dedup
             if res.high_signal:
-                if await synth_insight(slug, res.high_signal):
+                insight = await synth_insight(slug, res.high_signal)
+                if insight:
                     produced += 1
                     from app.channels.alerts import notify
                     await notify("insight", f"New insight · {slug}",
                                  body="The analyst formed a new insight from fresh signal.",
                                  brand_slug=slug, href="/admin/insights")
+                    # Autonomous CMO→FDE: ship a fix for connected-repo risks.
+                    if cfg.get("auto_fix") and insight.get("severity") == "risk":
+                        await _auto_fix(slug, cfg, insight)
         except Exception as exc:  # noqa: BLE001
             logger.warning("monitor tick failed for %s: %s", slug, exc)
         finally:

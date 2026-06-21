@@ -10,7 +10,7 @@ interface ToolChip {
 type Artifact =
   | { kind: "packet"; text: string }
   | { kind: "image"; url: string }
-  | { kind: "call_invite"; reason: string }
+  | { kind: "call_invite"; reason: string; report?: boolean; issue?: string }
   | {
       kind: "fix_result";
       repo?: string;
@@ -20,7 +20,13 @@ type Artifact =
       pr_url?: string;
       preview_url?: string;
       preview_note?: string;
+      before?: string;
+      after?: string;
+      resolved?: boolean;
     };
+
+// Slash commands that open the live "get on a call → show me → I'll fix it" flow.
+const REPORT_COMMANDS = ["/report", "/idea", "/recommend", "/rec"];
 
 export default function ChatThread({ injected, onAssistant }: { injected?: string; onAssistant?: (text: string) => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -36,9 +42,97 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
     if (injected) setInput(injected);
   }, [injected]);
 
+  // /report | /idea | /rec | /recommend → open the live call + screen-share flow
+  // instead of a plain chat turn.
+  function startReportFlow(raw: string) {
+    const cmd = raw.split(/\s+/)[0].toLowerCase();
+    const issue = raw.slice(cmd.length).trim() || "Something on the site looks off.";
+    setInput("");
+    setTools([]);
+    setStreaming("");
+    setStatus("");
+    setMessages((m) => [
+      ...m,
+      { role: "user", content: raw },
+      {
+        role: "assistant",
+        content:
+          "Let's hop on a quick call so I can see it. Tap Join, share your screen, " +
+          "and show me what's not working — then I'll build you a fixed preview.",
+      },
+    ]);
+    setArtifact({
+      kind: "call_invite",
+      reason:
+        "Share your screen so I can see exactly what's off — then I'll build a fixed preview.",
+      report: true,
+      issue,
+    });
+  }
+
+  // User confirmed they're sharing their screen → acknowledge, then run the real
+  // FDE fix and deploy a private preview (no PR is pushed).
+  async function onScreenShared(issue: string) {
+    if (busy) return;
+    setArtifact(null);
+    setBusy(true);
+    setMessages((m) => [
+      ...m,
+      {
+        role: "assistant",
+        content:
+          "Yes — I can see your screen share now. I can see the issue. Give me a moment, " +
+          "I'm building a fixed preview…",
+      },
+    ]);
+    setStatus("Building a fixed preview…");
+    try {
+      const r = await fetch("/api/fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symptom: issue }),
+      });
+      const d = (await r.json()) as Record<string, unknown>;
+      setArtifact({
+        kind: "fix_result",
+        file: d.file as string,
+        explanation: d.explanation as string,
+        preview_url: d.preview_url as string,
+        before: d.before as string,
+        after: d.after as string,
+        resolved: Boolean(d.resolved),
+      });
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: d.preview_url
+            ? "Done — I fixed it and deployed a private preview. Open it below to check; " +
+              "nothing was pushed to production."
+            : d.error
+              ? `I hit a snag building the preview: ${d.error}`
+              : "I took a pass at it — here's what I found.",
+        },
+      ]);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: "⚠ Couldn't reach the fix engine. Try again in a moment." },
+      ]);
+    } finally {
+      setBusy(false);
+      setStatus("");
+      inputRef.current?.focus();
+    }
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
+    if (REPORT_COMMANDS.includes(text.split(/\s+/)[0].toLowerCase())) {
+      startReportFlow(text);
+      return;
+    }
     setBusy(true);
     setInput("");
     setTools([]);
@@ -123,6 +217,11 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
         {messages.length === 0 && !busy && (
           <p className="text-sm text-white/40">
             Ask TwoCustomer to monitor a brand, build a campaign, fix a site, or edit an image.
+            <br />
+            Or type <span className="text-accent-soft">/report</span> (also{" "}
+            <span className="text-accent-soft">/idea</span>,{" "}
+            <span className="text-accent-soft">/rec</span>) to hop on a call, share your
+            screen, and get a fixed preview.
           </p>
         )}
         {messages.map((m, i) => (
@@ -183,7 +282,15 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
             <img src={artifact.url} alt="generated" className="max-h-72 rounded-lg" />
           </div>
         )}
-        {artifact?.kind === "call_invite" && <JoinCallCard reason={artifact.reason} />}
+        {artifact?.kind === "call_invite" && (
+          <JoinCallCard
+            reason={artifact.reason}
+            report={artifact.report}
+            onShared={
+              artifact.report ? () => onScreenShared(artifact.issue || "") : undefined
+            }
+          />
+        )}
         {artifact?.kind === "fix_result" && (
           <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
             <div className="mb-1 text-xs font-medium text-accent-soft">🔧 Fix ready</div>
@@ -191,7 +298,21 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
               <p className="text-sm text-white/80">{artifact.explanation}</p>
             )}
             {artifact.file && (
-              <p className="mt-1 text-xs text-white/50">{artifact.repo} · {artifact.file}</p>
+              <p className="mt-1 text-xs text-white/50">
+                {[artifact.repo, artifact.file].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            {(artifact.before || artifact.after) && (
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg border border-red-400/20 bg-red-400/[0.06] p-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-red-300/80">Before</div>
+                  <pre className="whitespace-pre-wrap text-red-100/80">{artifact.before}</pre>
+                </div>
+                <div className="rounded-lg border border-accent/20 bg-accent/[0.06] p-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-accent-soft">After</div>
+                  <pre className="whitespace-pre-wrap text-white/80">{artifact.after}</pre>
+                </div>
+              </div>
             )}
             {artifact.diff && (
               <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-white/10 bg-black/40 p-2 text-xs text-white/70">
@@ -241,7 +362,15 @@ export default function ChatThread({ injected, onAssistant }: { injected?: strin
   );
 }
 
-function JoinCallCard({ reason }: { reason: string }) {
+function JoinCallCard({
+  reason,
+  report,
+  onShared,
+}: {
+  reason: string;
+  report?: boolean;
+  onShared?: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [room, setRoom] = useState<string | null>(null);
 
@@ -275,12 +404,25 @@ function JoinCallCard({ reason }: { reason: string }) {
           {busy ? "Starting call…" : "Join video call"}
         </button>
       ) : (
-        <iframe
-          src={room}
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          className="mt-2 h-[55vh] w-full rounded-lg border border-white/10"
-        />
+        <>
+          <iframe
+            src={room}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            className="mt-2 h-[55vh] w-full rounded-lg border border-white/10"
+          />
+          {/* In the /report flow, once the user is on the call and sharing, this
+              hands control back so the agent can "see" the screen and build the fix. */}
+          {report && onShared && (
+            <button
+              onClick={onShared}
+              className="mt-2 rounded-lg border border-accent/40 px-4 py-2 text-sm font-medium text-accent-soft hover:bg-accent/10"
+            >
+              ✓ I&apos;m sharing my screen — show me the fix
+            </button>
+          )}
+        </>
       )}
+      {room && <p className="mt-2 break-all text-xs text-white/40">{room}</p>}
     </div>
   );
 }

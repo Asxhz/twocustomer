@@ -202,6 +202,7 @@ class MonitorConfigBody(BaseModel):
     interval_minutes: int = 30
     threshold: float = 0.7
     enabled: bool = True
+    auto_fix: bool = False
     project_type: str = "physical"
     repo_url: str = ""
     discord_channel: str = ""
@@ -552,7 +553,7 @@ async def link_guild(guild_id: str, is_admin: bool, email: str) -> str:
 
     if not guild_id:
         return "Run /setup inside your server."
-    demo_email = _os.environ.get("DEMO_FOUNDER_EMAIL", "ashmit@berkeley.edu").strip().lower()
+    demo_email = _os.environ.get("DEMO_FOUNDER_EMAIL", "").strip().lower()
     if demo_email:
         email = demo_email
     else:

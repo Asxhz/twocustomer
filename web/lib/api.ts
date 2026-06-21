@@ -4,12 +4,18 @@ export const AGENT_BASE_URL =
   process.env.AGENT_BASE_URL || "http://localhost:8000";
 
 // Server-side headers for agent calls. attaches the shared bearer token when set.
+// When the agent is deployed behind Vercel Deployment Protection, set
+// AGENT_PROTECTION_BYPASS to the agent project's "Protection Bypass for
+// Automation" secret so server-to-server calls pass the SSO wall (the wall stays
+// up for everyone else). Harmless/no-op when unset (e.g. local dev).
 export function agentHeaders(
   extra: Record<string, string> = {},
 ): Record<string, string> {
   const h: Record<string, string> = { ...extra };
   const tok = process.env.AGENT_SHARED_TOKEN;
   if (tok) h["Authorization"] = `Bearer ${tok}`;
+  const bypass = process.env.AGENT_PROTECTION_BYPASS;
+  if (bypass) h["x-vercel-protection-bypass"] = bypass;
   return h;
 }
 

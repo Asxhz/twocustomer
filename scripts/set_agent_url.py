@@ -9,6 +9,7 @@ Cloudflare tunnel URL changes.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,7 +18,9 @@ import httpx
 from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parents[1]
-SCOPE = "ashs-projects-548e0de1"
+# Vercel team/scope for the web project. Read from env (VERCEL_SCOPE) so this
+# isn't tied to one account; falls back to .env if not exported.
+SCOPE = os.environ.get("VERCEL_SCOPE") or dotenv_values(ROOT / ".env").get("VERCEL_SCOPE", "")
 
 
 def main() -> int:
