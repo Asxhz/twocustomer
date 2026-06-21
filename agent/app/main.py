@@ -607,7 +607,7 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
 
     cx = get_convex()
     slug = brand.get("slug") if brand else ""
-    web = settings.web_base_url.rstrip("/")
+    web = settings.public_web_url.rstrip("/")  # reachable off this machine
 
     # Unique website join link (guest or signup) where the user can describe the
     # fix in text and talk to the AI by voice.
@@ -618,19 +618,24 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
                                              discordUserId=str(user_id), brand=slug) or ""
         except Exception:  # noqa: BLE001
             invite_token = ""
-    join_link = f"{web}/sign-in?invite={invite_token}" + (f"&brand={slug}" if slug else "")
+    qs = f"?invite={invite_token}&join=1" + (f"&brand={slug}" if slug else "")
+    join_link = f"{web}/sign-in{qs}"
 
     # Live video call with the voice agent already in the room.
     call = await start_agent_call(slug)
     room_url = call.get("room_url", "") if call else ""
 
+    # Always deliver the links: DM first, and return them in the reply so the user
+    # gets them even if DMs are closed.
+    links = [f"🎤 Interview + talk to the agent: {join_link}"]
+    if room_url:
+        links.append(f"🎥 Or jump on a live call (I'll be there): {room_url}")
+    dm_ok = False
     if user_id:
-        msg = ["Thanks for flagging it. Two ways to go deeper:"]
-        if room_url:
-            msg.append(f"- Hop on a quick video call, I'll be there: {room_url}")
-        msg.append(f"- Or open this link to add detail by text or voice: {join_link}")
-        msg.append("I'm already working on a fix.")
-        await discord.dm(user_id, "\n".join(msg))
+        dm_ok = await discord.dm(
+            user_id,
+            "Thanks for flagging it. I'm on it.\n" + "\n".join(links) +
+            "\nYou can sign up or continue as guest.")
 
     if slug:
         try:
@@ -641,14 +646,19 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
             pass
 
     repo_url = (brand.get("repoUrl") if brand else "") or settings.demo_repo
-    token = decrypt_secret(company.get("githubTokenEnc", "") or "") or ""
+    token = (decrypt_secret(company.get("githubTokenEnc", "") or "") or settings.github_token or "")
     from app.fde.repo_sandbox import fix_connected_repo
 
     res = await fix_connected_repo(repo_url, reported, token=token)
+    link_line = ("" if dm_ok else "\n" + "\n".join(links))
+
     if res.get("error"):
-        if user_id:
-            await discord.dm(user_id, f"I hit a snag on the fix: {res['error']}")
-        return f"Reported. Fix attempt failed: {res['error']}"
+        err = res["error"]
+        hint = (" Connect GitHub in Settings (paste a token) so I can read + fix the repo."
+                if "403" in err or "not found" in err or "401" in err else "")
+        if user_id and dm_ok:
+            await discord.dm(user_id, f"On the fix: {err}.{hint}")
+        return f"Sent you the interview + call links.{link_line}\nFix needs attention: {err}.{hint}"
 
     preview, pr = res.get("preview_url"), res.get("pr_url")
     parts = ["I pushed a fix."]
@@ -656,13 +666,14 @@ async def handle_report(guild_id: str, user_id: str, text: str) -> str:
         parts.append(f"Test it (safe preview, prod untouched): {preview}")
     if pr:
         parts.append(f"PR opened for the team: {pr}")
-    parts.append("Still off? Run /report again.")
-    if user_id:
+    if not pr and not preview:
+        parts.append("Diff ready. add a GitHub token in Settings to auto-open the PR.")
+    if user_id and dm_ok:
         await discord.dm(user_id, "\n".join(parts))
     await notify("fix", f"Customer report fixed - {slug}",
                  body=f"{reported[:120]} -> {res.get('file', 'patched')}",
                  brand_slug=slug, href=pr or "/admin")
-    return "On it. DM'd the reporter a call link, a join link, and the fix preview + PR."
+    return (f"On it. Sent the reporter the interview + call links and worked the fix.{link_line}")
 
 
 async def _discord_report(payload: dict[str, Any]) -> str:

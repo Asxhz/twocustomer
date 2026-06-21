@@ -36,10 +36,11 @@ S = get_settings()
 SYSTEM = (
     "You are TwoCustomer, a forward-deployed engineer on a live video call with a "
     "customer. Keep replies short and spoken-friendly. Ask one clarifying question if "
-    "needed. The moment the user describes a concrete bug or broken behavior, say a "
-    "quick 'on it' and call fix_connected_repo with a clear symptom. After it returns, "
-    "tell them in one sentence what you fixed and that the preview link is in the chat. "
-    "Never read out long URLs."
+    "needed. The moment the user describes a concrete bug or broken behavior, say "
+    "exactly 'On it, give me a moment' and immediately call fix_connected_repo with a "
+    "clear one-line symptom. Do NOT say anything else while it runs. When it returns, "
+    "say in one sentence what you fixed and that the preview and PR links are in the "
+    "chat. Never read out URLs."
 )
 
 FIX_SCHEMA = FunctionSchema(
@@ -65,31 +66,36 @@ async def run_bot(room_url: str, token: str, *, brand_slug: str = "",
     tts = DeepgramTTSService(api_key=S.deepgram_api_key, voice="aura-2-thalia-en")
     llm = AnthropicLLMService(api_key=S.anthropic_api_key, model=model_for("chat"))
 
+    async def _chat(text: str) -> None:
+        try:
+            await transport.send_prebuilt_chat_message(text, "TwoCustomer")
+        except Exception:  # noqa: BLE001
+            pass
+
     async def do_fix(params: Any) -> None:
         symptom = (params.arguments or {}).get("symptom", "the reported issue")
-        if not repo_url:
-            await params.result_callback(
-                {"error": "No repo is connected for this brand yet."})
-            return
+        await _chat(f"🔧 On it. Building a fix for: {symptom}")
         from app.fde.repo_sandbox import fix_connected_repo
 
         res = await fix_connected_repo(repo_url, symptom, token=github_token)
-        # Post preview + PR into the call chat so the user can open them.
+        if res.get("error"):
+            await _chat(f"⚠ {res['error']} (connect GitHub in Settings to fix this repo)")
+            await params.result_callback({"error": res["error"]})
+            return
+        # Post preview + PR into the call chat so the user can open them right there.
         links = []
         if res.get("preview_url"):
-            links.append(f"Preview: {res['preview_url']}")
+            links.append(f"✅ Preview (safe, prod untouched): {res['preview_url']}")
         if res.get("pr_url"):
-            links.append(f"PR: {res['pr_url']}")
-        if links:
-            try:
-                await transport.send_message(  # app message into the Daily call
-                    {"type": "fix_result", "text": "  ".join(links)})
-            except Exception:  # noqa: BLE001
-                pass
+            links.append(f"🔀 PR: {res['pr_url']}")
+        if not links:
+            links.append("Diff ready. add a GitHub token in Settings to open the PR + preview.")
+        await _chat("\n".join(links))
         await params.result_callback({
-            "explanation": res.get("explanation") or res.get("error") or "done",
+            "explanation": res.get("explanation") or "done",
             "preview_url": res.get("preview_url"),
             "pr_url": res.get("pr_url"),
+            "spoke_links": "I dropped the preview and PR in the chat",
         })
 
     llm.register_function("fix_connected_repo", do_fix)

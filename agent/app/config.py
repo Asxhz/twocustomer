@@ -77,6 +77,10 @@ class Settings:
         # wiring
         self.agent_base_url = os.environ.get("AGENT_BASE_URL", "http://localhost:8000")
         self.web_base_url = os.environ.get("WEB_BASE_URL", "http://localhost:3000")
+        # Public web URL for links sent to users (Discord DMs etc.) — must be
+        # reachable off this machine, so default to the deployed site.
+        self.public_web_url = os.environ.get(
+            "PUBLIC_WEB_URL", "https://twocustomer-ashs-projects-548e0de1.vercel.app")
         self.shared_token = os.environ.get("AGENT_SHARED_TOKEN", "")
 
     @property

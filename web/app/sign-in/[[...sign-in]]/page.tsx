@@ -47,7 +47,8 @@ function AuthForm() {
         body: JSON.stringify({ brand, invite }),
       });
       if (!r.ok) throw new Error();
-      window.location.assign("/u");
+      // Invited from a report -> go straight into the voice interview.
+      window.location.assign(invite ? "/u/session" : "/u");
     } catch {
       setErr("Could not continue as guest.");
       setBusy(false);
